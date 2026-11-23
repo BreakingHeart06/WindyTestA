@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- [改文案-项目标题] -->
+<title>搓一款势力策略肉鸽</title>
+<!-- 本地化引用 Supabase，防微信/QQ白屏 -->
+<script src="./supabase.min.js"></script>
+<style>
+/* ================= [改文案-配色与字体变量] ================= */
+:root {
+  --bg-deep: #0a0c12;
+  --bg-panel: #131722;
+  --bg-card: #1a2030;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-gold: rgba(229, 184, 105, 0.42);
+  --text-main: #f1efe9;
+  --text-muted: #98a2b3;
+  --accent-gold: #e5b869;
+  --accent-crimson: #e63946;
+  --accent-jade: #2ec4b6;
+  --accent-amber: #f4a261;
+  --accent-purple: #9b72cf;
+  --font-serif: "Songti SC", "Noto Serif SC", "STSong", "SimSun", Georgia, serif;
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg-deep); color: var(--text-main);
+  font-family: var(--font-sans); font-size: 14px; line-height: 1.5;
+  min-height: 100vh; overflow-x: hidden;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(230, 57, 70, 0.08), transparent 45%),
+    radial-gradient(circle at 85% 20%, rgba(46, 196, 182, 0.07), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(229, 184, 105, 0.06), transparent 50%);
+}
+.app-shell {
+  position: relative; z-index: 1; max-width: 520px; margin: 0 auto;
+  min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 76px;
+  background: rgba(10, 12, 18, 0.65); box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+}
+.serif { font-family: var(--font-serif); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.custom-icon { width: 1.15em; height: 1.15em; vertical-align: -0.18em; object-fit: contain; display: inline-block; }
+
+/* 顶部状态栏 */
+.top-bar {
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(13, 16, 24, 0.94); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-gold); padding: 10px 14px;
+}
+.top-row-1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.brand-title {
+  font-family: var(--font-serif); font-size: 17px; font-weight: 700; letter-spacing: 1px;
+  color: var(--accent-gold); text-shadow: 0 0 12px rgba(229, 184, 105, 0.28);
+}
+.top-actions { display: flex; gap: 6px; align-items: center; }
+.icon-btn {
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-subtle);
+  color: var(--text-main); border-radius: 8px; padding: 5px 9px; font-size: 12px; cursor: pointer;
+}
+.icon-btn:active { transform: scale(0.95); }
+.icon-btn.gold { border-color: var(--border-gold); color: var(--accent-gold); }
+.icon-btn.danger { border-color: rgba(230,57,70,0.5); color: #ff858d; }
+
+.stats-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.stat-pill {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 5px 6px; text-align: center;
+}
+.stat-pill .label { font-size: 10px; color: var(--text-muted); display: block; }
+.stat-pill .val { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-main); }
+.stat-pill .val.gold { color: var(--accent-gold); }
+.stat-pill .val.jade { color: var(--accent-jade); }
+
+.main-content { padding: 12px; flex: 1; }
+.tab-pane { display: none; animation: fadeIn .2s ease; }
+.tab-pane.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px;
+}
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);
+}
+.card-title { font-family: var(--font-serif); font-size: 15px; font-weight: 700; color: var(--accent-gold); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 99px;
+  font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.08); color: var(--text-main);
+}
+.badge.gold { background: rgba(229,184,105,0.18); color: var(--accent-gold); border: 1px solid rgba(229,184,105,0.35); }
+.badge.crimson { background: rgba(230,57,70,0.2); color: #ff858d; border: 1px solid rgba(230,57,70,0.4); }
+.badge.jade { background: rgba(46,196,182,0.18); color: #6fffe9; border: 1px solid rgba(46,196,182,0.35); }
+.badge.amber { background: rgba(244,162,97,0.2); color: #ffd199; border: 1px solid rgba(244,162,97,0.4); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);
+  background: #252d42; color: var(--text-main); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.42; cursor: not-allowed; }
+.btn-primary { background: linear-gradient(135deg, #c99742, #e5b869); color: #14110b; border-color: #f3d28e; }
+.btn-crimson { background: linear-gradient(135deg, #b82330, #e63946); color: #fff; border-color: #ff6b76; }
+.btn-jade { background: linear-gradient(135deg, #1d8a80, #2ec4b6); color: #071917; border-color: #66e6da; }
+.btn-sm { padding: 6px 10px; font-size: 12px; }
+.btn-block { width: 100%; }
+
+/* 地图面板 */
+.map-wrapper {
+  position: relative; width: 100%; aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-gold);
+  background-color: #0f1522; background-size: cover; background-position: center;
+  margin-bottom: 10px; box-shadow: inset 0 0 36px rgba(0, 0, 0, 0.75);
+}
+.map-grid-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(229, 184, 105, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(229, 184, 105, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.map-watermark {
+  position: absolute; bottom: 6px; right: 10px; font-family: var(--font-serif);
+  font-size: 11px; letter-spacing: 2px; color: rgba(229, 184, 105, 0.35); pointer-events: none;
+}
+.map-pin {
+  position: absolute; transform: translate(-50%, -50%); min-width: 78px; padding: 5px 7px;
+  border-radius: 10px; background: rgba(14, 18, 28, 0.9); border: 1.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65); cursor: pointer; text-align: center; z-index: 2;
+}
+.map-pin.target-ready {
+  border-color: var(--accent-gold); animation: pulsePin 1.4s infinite;
+}
+@keyframes pulsePin {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(229, 184, 105, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(229, 184, 105, 0.12); }
+}
+.pin-name { font-size: 11px; font-weight: 700; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.pin-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.pin-meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.pin-flags { position: absolute; top: -10px; right: -6px; display: flex; gap: 2px; font-size: 11px; }
+.pin-deployed { margin-top: 2px; font-size: 10px; color: var(--accent-jade); font-weight: 600; }
+
+.hint-banner {
+  background: rgba(229, 184, 105, 0.1); border: 1px solid rgba(229, 184, 105, 0.32);
+  border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; color: #f6ddb0;
+  margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.wanted-bar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  font-size: 11px; margin-bottom: 10px; background: rgba(230, 57, 70, 0.1);
+  border: 1px solid rgba(230, 57, 70, 0.28); border-radius: var(--radius-sm); padding: 6px 10px; color: #ffb3b8;
+}
+.mp-status-bar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  font-size: 12px; margin-bottom: 10px; background: rgba(46, 196, 182, 0.1);
+  border: 1px solid rgba(46, 196, 182, 0.35); border-radius: var(--radius-sm); padding: 7px 10px; color: #9cf5eb;
+}
+
+/* 干员卡片 */
+.agent-list { display: flex; flex-direction: column; gap: 9px; }
+.agent-card {
+  background: var(--bg-card); border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 12px; position: relative;
+}
+.agent-card.selected { border-color: var(--accent-gold); background: rgba(229, 184, 105, 0.09); }
+.agent-card.deployed { border-color: rgba(46, 196, 182, 0.55); }
+.agent-card.injured { opacity: 0.62; border-style: dashed; }
+.agent-top { display: flex; gap: 10px; align-items: center; }
+.agent-avatar {
+  width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+  background: #232b40; border: 1px solid var(--border-gold);
+  display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden;
+}
+.agent-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.agent-name { font-size: 15px; font-weight: 700; }
+.agent-stats { display: flex; gap: 10px; margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+.agent-stats strong { font-family: var(--font-mono); color: var(--text-main); }
+.agent-quote {
+  margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--border-gold);
+  font-family: var(--font-serif); font-size: 12px; color: #cfc9bc; font-style: italic;
+}
+.skill-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.skill-tag {
+  font-size: 11px; padding: 2px 6px; border-radius: 6px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #d7dce8;
+}
+.skill-tag.neg { background: rgba(230,57,70,0.14); border-color: rgba(230,57,70,0.35); color: #ff9ea5; }
+.agent-footer {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;
+}
+
+/* 底部导航 */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 520px; z-index: 40;
+  background: rgba(13, 16, 24, 0.96); backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-gold); display: flex; justify-content: space-around;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+.nav-item {
+  flex: 1; background: none; border: none; color: var(--text-muted);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; padding: 4px 2px; cursor: pointer;
+}
+.nav-item .nav-ico { font-size: 18px; line-height: 1.1; }
+.nav-item.active { color: var(--accent-gold); font-weight: 700; }
+
+.settle-bar { margin-top: 12px; display: flex; gap: 8px; flex-direction: column; }
+
+/* 弹窗 */
+.modal-mask {
+  position: fixed; inset: 0; z-index: 100; background: rgba(4, 6, 10, 0.82);
+  backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; padding: 14px;
+}
+.modal-mask.show { display: flex; }
+.modal-box {
+  width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+  background: var(--bg-panel); border: 1px solid var(--border-gold);
+  border-radius: var(--radius-lg); padding: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);
+}
+.modal-title { font-family: var(--font-serif); font-size: 17px; font-weight: 700; color: var(--accent-gold); }
+
+/* 过场与号外 */
+.cutscene-mask {
+  position: fixed; inset: 0; z-index: 200; background: #06070a;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  padding: 28px; text-align: center;
+}
+.cutscene-mask.show { display: flex; }
+.cutscene-night {
+  font-family: var(--font-serif); font-size: 28px; font-weight: 700; letter-spacing: 6px;
+  color: var(--accent-crimson); text-shadow: 0 0 18px rgba(230, 57, 70, 0.75); margin-bottom: 16px;
+}
+.cutscene-text {
+  font-family: var(--font-serif); font-size: 16px; color: var(--accent-gold);
+  letter-spacing: 2px; min-height: 48px; max-width: 360px;
+}
+
+.newspaper-box {
+  background: #efe6d5; color: #1c1915; border: 3px double #2b2620;
+  border-radius: 6px; padding: 16px; font-family: var(--font-serif);
+}
+.news-masthead { text-align: center; border-top: 2px solid #1c1915; border-bottom: 3px double #1c1915; padding: 6px 0; margin-bottom: 10px; }
+.news-masthead h2 { margin: 0; font-size: 22px; letter-spacing: 4px; }
+.news-sub { font-size: 11px; color: #574e42; margin-top: 2px; }
+.news-headline { font-size: 18px; font-weight: 700; color: #8c1c1c; margin: 8px 0; line-height: 1.35; }
+.news-body { font-size: 14px; line-height: 1.75; white-space: pre-wrap; color: #24201b; }
+.news-effect {
+  margin-top: 10px; padding: 7px 10px; background: rgba(140, 28, 28, 0.1);
+  border-left: 3px solid #8c1c1c; font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: #6e1414;
+}
+
+/* 开局与大厅 */
+.start-screen {
+  position: fixed; inset: 0; z-index: 150; background: var(--bg-deep);
+  overflow-y: auto; padding: 20px 14px 40px; display: flex; flex-direction: column; align-items: center;
+}
+.start-inner { width: 100%; max-width: 480px; }
+.hero-title { text-align: center; margin: 10px 0 16px; }
+.hero-title h1 {
+  font-family: var(--font-serif); font-size: 30px; margin: 0;
+  color: var(--accent-gold); letter-spacing: 4px; text-shadow: 0 0 22px rgba(229, 184, 105, 0.35);
+}
+.hero-title p { margin: 6px 0 0; font-size: 12px; color: var(--text-muted); letter-spacing: 1px; }
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.faction-pick-card {
+  background: var(--bg-card); border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 11px 13px; margin-bottom: 9px; cursor: pointer;
+}
+.faction-pick-card.picked { border-color: var(--accent-gold); background: rgba(229, 184, 105, 0.08); }
+.faction-pick-card.taken { opacity: 0.55; cursor: not-allowed; }
+
+/* 表单 */
+.form-group { margin-bottom: 10px; }
+.form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+input[type="text"], input[type="number"], input[type="password"], select, textarea {
+  width: 100%; padding: 9px 10px; background: #0e121b; color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px; font-family: var(--font-sans); font-size: 16px;
+}
+textarea { min-height: 76px; resize: vertical; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gm-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; }
+.gm-tab-btn {
+  white-space: nowrap; padding: 6px 11px; border-radius: 99px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border-subtle);
+  color: var(--text-muted); font-size: 12px; cursor: pointer;
+}
+.gm-tab-btn.active { background: var(--accent-gold); color: #14110b; font-weight: 700; }
+
+.log-entry { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border-left: 3px solid var(--border-gold); margin-bottom: 7px; font-size: 12.5px; }
+.log-entry.battle { border-left-color: var(--accent-crimson); }
+.log-entry.good { border-left-color: var(--accent-jade); }
+.rank-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; margin-bottom: 5px; background: rgba(255,255,255,0.03); font-size: 12px; }
+.toast {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 300;
+  background: rgba(22, 27, 40, 0.96); border: 1px solid var(--accent-gold); color: var(--accent-gold);
+  padding: 8px 16px; border-radius: 99px; font-size: 13px; font-weight: 600; display: none;
+}
+.toast.show { display: block; animation: fadeIn .15s ease; }
+</style>
+</head>
+<body>
+
+<!-- ==================== 开局与联机大厅界面 ==================== -->
+<div id="startScreen" class="start-screen">
+  <div class="start-inner">
+    <div class="hero-title">
+      <!-- [改文案-开局大标题] -->
+      <h1>GONE WITH WIND</h1>
+      <p>搓一款势力策略肉鸽</p>
+      <div id="cloudStatusBadge" style="margin-top:6px;"></div>
+    </div>
+
+    <!-- 模式切换 -->
+    <div id="modeSelectBox">
+      <div class="mode-switch">
+        <button class="btn btn-primary" id="btnModeSolo" onclick="switchStartMode('solo')">👤 单人游玩</button>
+        <button class="btn" id="btnModeMp" onclick="switchStartMode('mp')">🌐 联机 (1~5人)</button>
+      </div>
+
+      <!-- 单人选阵营 -->
+      <div id="soloPanel" class="card">
+        <div class="card-header">
+          <span class="card-title">选择你要执掌的势力</span>
+          <button class="icon-btn gold" onclick="openGuideModal()">❓ 新手指引</button>
+        </div>
+        <div id="factionPickList"></div>
+        <button class="btn btn-primary btn-block" onclick="confirmStartSolo()">🎬 入夜开局（15晚风云）</button>
+      </div>
+
+      <!-- 多人建房/加房 -->
+      <div id="mpEntryPanel" class="card" style="display:none;">
+        <div class="card-header">
+          <span class="card-title">🌐 1~5人弹性联机</span>
+          <button class="icon-btn gold" onclick="openGuideModal()">❓ 指引</button>
+        </div>
+        <div class="form-group">
+          <label>你的昵称（群友可见）</label>
+          <input type="text" id="mpNickname" placeholder="例如：复仇千金淡淡恨/腹黑冷少狠狠爱">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="createMpRoom()">🏠 创建新房间（当房主）</button>
+        <div style="text-align:center; color:var(--text-muted); font-size:12px; margin:12px 0;">— 或者加入群友房间 —</div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="mpJoinCode" placeholder="输入4位房间号" maxlength="6" style="text-align:center; letter-spacing:3px; font-weight:700;">
+          <button class="btn btn-jade" style="white-space:nowrap;" onclick="joinMpRoom()">加入房间</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 联机等待大厅 -->
+    <div id="mpLobbyPanel" class="card" style="display:none;">
+      <div class="card-header">
+        <span class="card-title">房间号：<span id="lobbyRoomCode" class="mono" style="font-size:20px; letter-spacing:3px;">----</span></span>
+        <button class="icon-btn danger" onclick="leaveMpRoom()">退出房间</button>
+      </div>
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+        点击下方势力认领你的组织。未被认领的组织开局后自动由 <strong>「电脑托管」</strong> 补位。
+      </div>
+      <div id="lobbyFactionList"></div>
+      <div id="lobbyHostControls" style="margin-top:10px;"></div>
+    </div>
+
+    <div style="text-align:center; margin-top:10px;">
+      <button id="startGmBtn" class="icon-btn gold" style="display:none;" onclick="openGmAuth()">🔐 GM后台</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 主游戏壳 ==================== -->
+<div class="app-shell" id="appShell" style="display:none;">
+  <header class="top-bar">
+    <div class="top-row-1">
+      <div class="brand-title">GONE WITH WIND</div>
+      <div class="top-actions">
+        <button class="icon-btn" onclick="openGuideModal()">❓指引</button>
+        <button class="icon-btn" onclick="openRankModal()">🏆局势</button>
+        <button class="icon-btn danger" id="btnTopRestart" onclick="confirmRestart()">🔄重开</button>
+        <button id="topGmBtn" class="icon-btn gold" style="display:none;" onclick="openGmAuth()">🔐GM</button>
+      </div>
+    </div>
+    <div class="stats-strip">
+      <div class="stat-pill"><span class="label">当前进度</span><span class="val" id="statNight">第1/15晚</span></div>
+      <div class="stat-pill"><span class="label">可用资金</span><span class="val gold" id="statMoney">$120</span></div>
+      <div class="stat-pill"><span class="label">掌控地标</span><span class="val jade" id="statLandmarks">1/6</span></div>
+      <div class="stat-pill"><span class="label">今晚出勤</span><span class="val" id="statDeploy">0/3</span></div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- TAB 1: 部署（地图 + 堂口合并） -->
+    <section id="tab-deploy" class="tab-pane active">
+      <div id="mpStatusBar" class="mp-status-bar" style="display:none;"></div>
+      <div id="wantedBanner" class="wanted-bar"></div>
+      <div id="deployHint" class="hint-banner"></div>
+
+      <div id="mapBox" class="map-wrapper">
+        <div class="map-grid-bg"></div>
+        <div class="map-watermark">GONE WITH WIND · 198X</div>
+        <div id="mapPinsLayer"></div>
+      </div>
+
+      <div class="settle-bar" id="settleBar"></div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 2px 8px;">
+        <span class="serif" style="font-size:15px; font-weight:700; color:var(--accent-gold);">麾下干员（点击选中派驻）</span>
+        <span class="badge" id="rosterCountBadge">2人</span>
+      </div>
+      <div id="rosterList" class="agent-list"></div>
+    </section>
+
+    <!-- TAB 2: 招募与福利 -->
+    <section id="tab-market" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🕵️ 人才市场（2选1 · 每晚限招1人）</span>
+          <button class="btn btn-sm" id="btnRefreshMarket" onclick="refreshMarket()">🔄 刷新 $30</button>
+        </div>
+        <div id="marketMeta" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;"></div>
+        <div id="marketList" class="agent-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🏮 街道办福利（每晚随机2项）</span>
+          <span class="badge gold">限购</span>
+        </div>
+        <div id="welfareList" class="agent-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">💼 常规资金运作</span></div>
+        <button class="btn btn-block" onclick="buyInformant()">👁️ 买通线人（$40）— 预知明晚热点地标</button>
+        <div id="informantResult" style="font-size:12px; color:var(--accent-jade); margin-top:6px;"></div>
+        <p style="font-size:11px; color:var(--text-muted); margin:8px 0 0;">
+          提示：「发安家费（$30 忠诚+15）」与「捞人/请名医（$50 伤病-1晚）」直接在「部署」页干员卡片下方点击使用。
+        </p>
+      </div>
+    </section>
+
+    <!-- TAB 3: 城市晚报 -->
+    <section id="tab-news" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📰 城市晚报 · 战报档案</span>
+          <span class="badge" id="newsCountBadge">0条</span>
+        </div>
+        <div id="newsFeed"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="deploy" onclick="switchTab('deploy')"><span class="nav-ico">🗺️</span><span>部署</span></button>
+    <button class="nav-item" data-tab="market" onclick="switchTab('market')"><span class="nav-ico">🏮</span><span>招募与福利</span></button>
+    <button class="nav-item" data-tab="news" onclick="switchTab('news')"><span class="nav-ico">📰</span><span>城市晚报</span></button>
+  </nav>
+</div>
+
+<!-- 弹窗们 -->
+<div id="actionModal" class="modal-mask"><div class="modal-box">
+  <div class="modal-head"><span class="modal-title" id="actionModalTitle">选择今晚指令</span><button class="icon-btn" onclick="closeModal('actionModal')">✕</button></div>
+  <div id="actionModalSub" style="font-size:12px; color:var(--text-muted); margin-bottom:12px;"></div>
+  <div id="actionButtons" style="display:flex; flex-direction:column; gap:8px;"></div>
+</div></div>
+
+<div id="targetAgentModal" class="modal-mask"><div class="modal-box">
+  <div class="modal-head"><span class="modal-title" id="targetAgentTitle">选择目标干员</span><button class="icon-btn" onclick="closeModal('targetAgentModal')">✕</button></div>
+  <div id="targetAgentList" class="agent-list"></div>
+</div></div>
+
+<div id="guideModal" class="modal-mask"><div class="modal-box">
+  <div class="modal-head"><span class="modal-title">📖 新手指引 · 198X 生存法则</span><button class="icon-btn" onclick="closeModal('guideModal')">✕</button></div>
+  <!-- [改文案-新手指引] -->
+  <div style="font-size:13px; line-height:1.7; color:#dedbd2;">
+    <p style="margin-top:0;"><strong style="color:var(--accent-gold);">1. 胜利目标（双轨制）</strong><br>共 15 晚。率先掌控 <strong>4/6 处地标</strong> 立即获胜；若 15 晚结束无人达成，则按综合势力分（地标×100 + 资金/10 + 总控制度）决出胜负。</p>
+    <p><strong style="color:var(--accent-gold);">2. 棋盘式部署</strong><br>在「部署」页先点选下方干员，再点上方地图图钉选指令。每晚限派 <strong>3 人</strong>；连出 2 晚后，第 3 晚起触发疲劳（行动值 -15%、忠诚 -5）。</p>
+    <p><strong style="color:var(--accent-gold);">3. 四大指令克制</strong><br>⚔️火拼 克 💰交易（抢半数资金） · 🛡️巡逻 克 ⚔️火拼（防+20%） · 👁️打探 克 🛡️巡逻（额外降控15%）。</p>
+    <p style="margin-bottom:0;"><strong style="color:var(--accent-gold);">4. 联机说明</strong><br>多人联机时，每晚部署完点「锁定今晚部署」，全员锁定后自动由房主结算推进下一晚。</p>
+  </div>
+  <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="closeModal('guideModal')">明白了，入夜开工</button>
+</div></div>
+
+<div id="rankModal" class="modal-mask"><div class="modal-box">
+  <div class="modal-head"><span class="modal-title">🏆 全城势力局势</span><button class="icon-btn" onclick="closeModal('rankModal')">✕</button></div>
+  <div id="rankList"></div>
+</div></div>
+
+<div id="extraModal" class="modal-mask"><div class="modal-box" style="background:transparent; border:none; padding:0; box-shadow:none;">
+  <div class="newspaper-box">
+    <div class="news-masthead"><h2>城市晚报 · 头版号外</h2><div class="news-sub" id="extraMeta"></div></div>
+    <div class="news-headline" id="extraTitle"></div>
+    <div class="news-body" id="extraBody"></div>
+    <div class="news-effect" id="extraEffect" style="display:none;"></div>
+    <button class="btn btn-crimson btn-block" style="margin-top:14px;" onclick="nextExtraOrClose()">收起号外</button>
+  </div>
+</div></div>
+
+<div id="endModal" class="modal-mask"><div class="modal-box">
+  <div class="modal-head"><span class="modal-title" id="endTitle">终局结算</span></div>
+  <div id="endBody" style="margin-bottom:14px;"></div>
+  <button class="btn btn-primary btn-block" onclick="restartGame()">🔄 再来一局</button>
+</div></div>
+
+<div id="gmAuthModal" class="modal-mask"><div class="modal-box">
+  <div class="modal-head"><span class="modal-title">🔐 GM 后台验证</span><button class="icon-btn" onclick="closeModal('gmAuthModal')">✕</button></div>
+  <div class="form-group"><label>请输入管理员密码</label><input type="password" id="gmPwdInput" placeholder="输入密码"></div>
+  <button class="btn btn-primary btn-block" onclick="verifyGmPwd()">进入后台</button>
+</div></div>
+
+<div id="gmModal" class="modal-mask"><div class="modal-box" style="max-width:500px; max-height:92vh;">
+  <div class="modal-head"><span class="modal-title">🔐 GoneWithWind · GM工坊</span><button class="icon-btn" onclick="closeGmModal()">保存并返回</button></div>
+  <div class="gm-tabs">
+    <button class="gm-tab-btn active" onclick="switchGmTab('world', this)">世界/地图/过场</button>
+    <button class="gm-tab-btn" onclick="switchGmTab('agents', this)">干员OC</button>
+    <button class="gm-tab-btn" onclick="switchGmTab('skills', this)">技能工坊</button>
+    <button class="gm-tab-btn" onclick="switchGmTab('stories', this)">小故事与号外</button>
+    <button class="gm-tab-btn" onclick="switchGmTab('io', this)">导入/导出</button>
+  </div>
+  <div id="gmContent"></div>
+</div></div>
+
+<div id="cutsceneMask" class="cutscene-mask">
+  <div class="cutscene-night" id="cutsceneNight">第 2 晚</div>
+  <div class="cutscene-text" id="cutsceneText"></div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* =========================================================================
+   0. [填入你的Supabase配置]（只需填这两行即可开启云端存档与多人联机）
+   ========================================================================= */
+const SUPABASE_URL = 'https://reibyolszcvtjitiarpe.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'sb_publishable_FZMGyRcY8uVJvV-_Oaz0Pw_GxqBYEiK';
+
+let sb = null;
+let cloudReady = false;
+if (window.supabase && SUPABASE_URL.startsWith('http') && !SUPABASE_KEY.includes('粘贴')) {
+  try {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    cloudReady = true;
+  } catch (e) { console.warn('Supabase init failed:', e); }
+}
+
+/* =========================================================================
+   1. [改文案-基础配置与图标字典]
+   ========================================================================= */
+const GM_URL_KEYS = ['?.551024', '.551024', '551024'];
+const GM_PASSWORD = '551024';
+const CONFIG_STORAGE_KEY = 'gww_v3_config';
+
+// [改文案-图标] 替换成图片路径自动渲染 <img>
+const UI_ICONS = {
+  combat: '⚔️', resource: '💼', strategy: '👁️',
+  patrol: '🛡️', trade: '💰', intel: '🔎', fight: '🔥',
+  hotspot: '🔥', battle: '⚔️', flip: '🚩'
+};
+
+function renderIcon(val, cls = '') {
+  if (!val) return '';
+  if (/^(https?:|data:|\/|\.\/|\.\.\/)/.test(val)) return `<img src="${val}" class="custom-icon ${cls}" alt="">`;
+  return `<span class="${cls}">${val}</span>`;
+}
+
+const ROLE_META = {
+  combat:   { name: '战斗位', icon: () => UI_ICONS.combat,   desc: '火拼/巡逻效果 +25%' },
+  resource: { name: '资源位', icon: () => UI_ICONS.resource, desc: '暗中交易收益 +30%' },
+  strategy: { name: '策略位', icon: () => UI_ICONS.strategy, desc: '打探情报削弱敌控并多赚情报费' }
+};
+const ACTION_META = {
+  patrol: { name: '巡逻布控', icon: () => UI_ICONS.patrol, desc: '提升控制度；克制「火拼」（防守+20%）' },
+  trade:  { name: '暗中交易', icon: () => UI_ICONS.trade,  desc: '赚取资金；被「火拼」克制（被抢半数资金）' },
+  intel:  { name: '打探情报', icon: () => UI_ICONS.intel,  desc: '赚情报费并降敌控；克制「巡逻」（额外降控15%）' },
+  fight:  { name: '强硬火拼', icon: () => UI_ICONS.fight,  desc: '争夺地标控制；克制「交易」（抢半数资金）' }
+};
+// [改文案-街道办福利]
+const WELFARE_POOL = [
+  { id: 'w1', name: '福利一', cost: 35, desc: '立刻清除 1 名干员的连轴转疲劳。', needTarget: 'any' },
+  { id: 'w2', name: '福利二', cost: 45, desc: '指定 1 名干员今晚冲突若战败，免受住院/拘留。', needTarget: 'healthy' },
+  { id: 'w3', name: '福利三', cost: 40, desc: '指定 1 名干员忠诚立刻 +20。', needTarget: 'any' },
+  { id: 'w4', name: '福利四', cost: 60, desc: '今晚出勤上限临时 +1（最多派 4 人）。', needTarget: 'none' }
+];
+
+/* =========================================================================
+   2. [改文案-默认世界观数据包]
+   ========================================================================= */
+function createDefaultConfig() {
+  return {
+    mapImage: '',
+    cutsceneTexts: [
+      '霓虹初上，旧街区的风声又紧了几分。',
+      '维港雾浓，今晚的筹码已经在暗处码齐。',
+      '茶楼打烊，真正的生意才刚刚开张。',
+      '警笛在巷口一闪而过，谁也没看清谁的底牌。',
+      '雨落骑楼，今夜之后地盘又要换人说话。'
+    ],
+    factions: [
+      { id: 'f1', name: '组织一', desc: '介绍1', color: '#3b82f6', hq: 'l1' },
+      { id: 'f2', name: '组织二', desc: '介绍2', color: '#e63946', hq: 'l2' },
+      { id: 'f3', name: '组织三', desc: '介绍3', color: '#e5b869', hq: 'l3' },
+      { id: 'f4', name: '组织四', desc: '介绍4', color: '#2ec4b6', hq: 'l4' },
+      { id: 'f5', name: '组织五', desc: '介绍5', color: '#9b72cf', hq: 'l5' }
+    ],
+    landmarks: [
+      { id: 'l1', name: '地标一', x: 20, y: 26, defaultOwner: 'f1' },
+      { id: 'l2', name: '地标二', x: 78, y: 24, defaultOwner: 'f2' },
+      { id: 'l3', name: '地标三', x: 22, y: 74, defaultOwner: 'f3' },
+      { id: 'l4', name: '地标四', x: 78, y: 74, defaultOwner: 'f4' },
+      { id: 'l5', name: '地标五', x: 50, y: 82, defaultOwner: 'f5' },
+      { id: 'l6', name: '中立地标', x: 50, y: 44, defaultOwner: null }
+    ],
+    skills: [
+      { id: 's1', name: '技能1', trigger: 'on_recruit', effectType: 'money', value: 120, param: '', desc: '招募入队时，资金 +$120' },
+      { id: 's2', name: '技能2', trigger: 'on_deploy', effectType: 'money', value: 30, param: '', desc: '每次出勤时，额外赚取资金 +$30' },
+      { id: 's3', name: '技能3', trigger: 'on_streak', effectType: 'power_pct', value: 8, param: '', desc: '每连续出勤 1 晚，行动值 +8%' },
+      { id: 's4', name: '技能4', trigger: 'on_action', effectType: 'power_pct', value: 20, param: 'fight', desc: '执行「强硬火拼」时效果 +20%' },
+      { id: 's5', name: '技能5', trigger: 'on_landmark', effectType: 'power_pct', value: 18, param: 'l6', desc: '在「中立地标」行动值 +18%' },
+      { id: 's6', name: '技能6', trigger: 'on_win', effectType: 'money', value: 40, param: '', desc: '冲突获胜时，额外缴获资金 +$40' },
+      { id: 's7', name: '技能7', trigger: 'on_lose', effectType: 'immune_injury', value: 1, param: '', desc: '冲突战败时，全身而退免受住院/拘留' },
+      { id: 's8', name: '技能8', trigger: 'passive', effectType: 'loyalty_night', value: -5, param: '', desc: '【负面】常驻每晚自然掉忠诚 5 点' }
+    ],
+    agents: [
+      { id: 'a1', factionId: 'f1', name: '角色A1', role: 'combat',   power: 82, loyalty: 85, quote: '这条街的规矩，今晚我来画线。', skills: ['s4'], avatar: '' },
+      { id: 'a2', factionId: 'f1', name: '角色A2', role: 'resource', power: 74, loyalty: 88, quote: '账本算得清，人情才算得清。', skills: ['s2'], avatar: '' },
+      { id: 'a3', factionId: 'f1', name: '角色A3', role: 'strategy', power: 78, loyalty: 80, quote: '', skills: ['s5'], avatar: '' },
+      { id: 'a4', factionId: 'f1', name: '角色A4', role: 'combat',   power: 88, loyalty: 72, quote: '先动手的人，才有资格讲道理。', skills: ['s6', 's8'], avatar: '' },
+      { id: 'a5', factionId: 'f1', name: '角色A5', role: 'resource', power: 70, loyalty: 90, quote: '带资进组，今晚我请客。', skills: ['s1'], avatar: '' },
+      { id: 'a6', factionId: 'f1', name: '角色A6', role: 'combat',   power: 76, loyalty: 82, quote: '越熬越精神。', skills: ['s3'], avatar: '' },
+      { id: 'b1', factionId: 'f2', name: '角色B1', role: 'combat',   power: 84, loyalty: 85, quote: '借过，今晚清场。', skills: ['s4'], avatar: '' },
+      { id: 'b2', factionId: 'f2', name: '角色B2', role: 'resource', power: 75, loyalty: 82, quote: '', skills: ['s2'], avatar: '' },
+      { id: 'b3', factionId: 'f2', name: '角色B3', role: 'strategy', power: 79, loyalty: 80, quote: '', skills: ['s7'], avatar: '' },
+      { id: 'b4', factionId: 'f2', name: '角色B4', role: 'combat',   power: 86, loyalty: 76, quote: '', skills: ['s6'], avatar: '' },
+      { id: 'c1', factionId: 'f3', name: '角色C1', role: 'resource', power: 80, loyalty: 86, quote: '', skills: ['s2'], avatar: '' },
+      { id: 'c2', factionId: 'f3', name: '角色C2', role: 'combat',   power: 78, loyalty: 84, quote: '', skills: ['s3'], avatar: '' },
+      { id: 'c3', factionId: 'f3', name: '角色C3', role: 'strategy', power: 82, loyalty: 80, quote: '', skills: ['s5'], avatar: '' },
+      { id: 'd1', factionId: 'f4', name: '角色D1', role: 'combat',   power: 83, loyalty: 82, quote: '', skills: ['s4'], avatar: '' },
+      { id: 'd2', factionId: 'f4', name: '角色D2', role: 'strategy', power: 77, loyalty: 86, quote: '', skills: ['s7'], avatar: '' },
+      { id: 'd3', factionId: 'f4', name: '角色D3', role: 'resource', power: 76, loyalty: 80, quote: '', skills: ['s2'], avatar: '' },
+      { id: 'e1', factionId: 'f5', name: '角色E1', role: 'strategy', power: 84, loyalty: 85, quote: '', skills: ['s5'], avatar: '' },
+      { id: 'e2', factionId: 'f5', name: '角色E2', role: 'combat',   power: 81, loyalty: 80, quote: '', skills: ['s4'], avatar: '' },
+      { id: 'e3', factionId: 'f5', name: '角色E3', role: 'resource', power: 76, loyalty: 84, quote: '', skills: ['s1'], avatar: '' }
+    ],
+    stories: [
+      { id: 'st1', type: 'encounter', title: '骑楼下的旧相识', agent1: 'a1', agent2: 'a2', night: 0, body: '雨声砸在铁皮棚顶，角色A1递过一支烟，角色A2顺手拢住了火苗。两人相视一笑，默契油然而生。', effectType: 'money', effectValue: 35 },
+      { id: 'st2', type: 'timed', title: '深夜码头鸣笛', agent1: '', agent2: '', night: 3, body: '第三晚凌晨，一艘无名货轮靠岸又匆匆离去。街面上顿时流传起新的暗语。', effectType: 'loyalty', effectValue: 5 }
+    ],
+    extras: [
+      { id: 'ex1', title: '全城大停电半小时，暗巷风声鹤唳', body: '昨晚九点半，旧城区变电站突发故障，待霓虹重新亮起时，几家商铺门口多了不明粉笔记号。', effectType: 'all_money', effectValue: 25 },
+      { id: 'ex2', title: '大风暴迫近，街面巡查加严', body: '天文台挂起三号风球，茶楼与夜总会纷纷提早落闸，各方人手士气略受影响。', effectType: 'player_loyalty', effectValue: -5 },
+      { id: 'ex3', title: '神秘富商包场摆酒，现金流涌入旧街', body: '传闻有外埠富豪连包三层酒楼谈生意，一时间街面资金充裕。', effectType: 'player_money', effectValue: 45 }
+    ]
+  };
+}
+
+let CONFIG = loadLocalConfig();
+function loadLocalConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (raw) return { ...createDefaultConfig(), ...JSON.parse(raw) };
+  } catch (e) {}
+  return createDefaultConfig();
+}
+
+async function syncConfigFromCloud() {
+  const badge = document.getElementById('cloudStatusBadge');
+  if (!cloudReady) {
+    badge.innerHTML = `<span class="badge amber">离线单机模式（未配置Supabase）</span>`;
+    return;
+  }
+  badge.innerHTML = `<span class="badge">☁️ 正在同步云端设定...</span>`;
+  try {
+    const { data, error } = await sb.from('game_config').select('data').eq('id', 'main').maybeSingle();
+    if (!error && data && data.data) {
+      CONFIG = { ...createDefaultConfig(), ...data.data };
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(CONFIG));
+      badge.innerHTML = `<span class="badge jade">☁️ 云端设定已同步</span>`;
+    } else {
+      badge.innerHTML = `<span class="badge jade">☁️ 云端已连接（当前为默认设定）</span>`;
+    }
+  } catch (e) {
+    badge.innerHTML = `<span class="badge crimson">☁️ 云端连接失败，已用本地缓存</span>`;
+  }
+  renderStartScreen();
+}
+
+async function saveConfig() {
+  try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(CONFIG)); } catch (e) {}
+  if (cloudReady) {
+    const { error } = await sb.from('game_config').upsert({
+      id: 'main', data: CONFIG, updated_at: new Date().toISOString()
+    });
+    if (error) showToast('云端保存失败：' + error.message);
+    else showToast('已同步保存到云端数据库！');
+  }
+}
+
+/* =========================================================================
+   3. 联机状态与房间管理
+   ========================================================================= */
+const MY_UID = localStorage.getItem('gww_uid') || ('u_' + Math.random().toString(36).slice(2, 10));
+localStorage.setItem('gww_uid', MY_UID);
+
+let MP = {
+  active: false,
+  roomCode: null,
+  isHost: false,
+  nickname: localStorage.getItem('gww_nick') || '',
+  players: {},      // { [factionId]: { uid, name } }
+  turnActions: {},  // { [factionId]: { ready, deployments, money, recruitedIds, agentUpdates, deployCapBonus } }
+  myLocked: false,
+  pollTimer: null,
+  resolving: false
+};
+
+let GAME = null;
+let selectedFactionId = CONFIG.factions[0].id;
+let selectedAgentId = null;
+let pendingDeployLandmarkId = null;
+let pendingWelfare = null;
+let extraQueue = [];
+let gmAuthed = false;
+let currentGmTab = 'world';
+let myLocalNight = 0;
+
+function switchStartMode(mode) {
+  document.getElementById('btnModeSolo').className = mode === 'solo' ? 'btn btn-primary' : 'btn';
+  document.getElementById('btnModeMp').className = mode === 'mp' ? 'btn btn-primary' : 'btn';
+  document.getElementById('soloPanel').style.display = mode === 'solo' ? 'block' : 'none';
+  document.getElementById('mpEntryPanel').style.display = mode === 'mp' ? 'block' : 'none';
+  if (mode === 'mp' && !cloudReady) showToast('请先在代码顶部填入 Supabase URL 和 Key');
+}
+
+async function createMpRoom() {
+  if (!cloudReady) return showToast('未连接 Supabase，无法联机');
+  const nick = document.getElementById('mpNickname').value.trim() || '房主';
+  localStorage.setItem('gww_nick', nick);
+  MP.nickname = nick;
+  const code = String(Math.floor(1000 + Math.random() * 9000));
+  const players = { [CONFIG.factions[0].id]: { uid: MY_UID, name: nick } };
+
+  const { error } = await sb.from('game_rooms').insert({
+    room_code: code, host_id: MY_UID, status: 'lobby', players, state: {}, turn_actions: {}
+  });
+  if (error) return showToast('建房失败：' + error.message);
+
+  enterLobby(code, true, players);
+}
+
+async function joinMpRoom() {
+  if (!cloudReady) return showToast('未连接 Supabase，无法联机');
+  const nick = document.getElementById('mpNickname').value.trim() || '玩家' + MY_UID.slice(-3);
+  const code = document.getElementById('mpJoinCode').value.trim();
+  if (!code) return showToast('请输入房间号');
+  localStorage.setItem('gww_nick', nick);
+  MP.nickname = nick;
+
+  const { data, error } = await sb.from('game_rooms').select('*').eq('room_code', code).maybeSingle();
+  if (error || !data) return showToast('未找到该房间');
+  if (data.status === 'playing') {
+    // 断线重连支持
+    const myFid = Object.keys(data.players || {}).find(fid => data.players[fid].uid === MY_UID);
+    if (!myFid) return showToast('该房间已经开局');
+    MP.active = true; MP.roomCode = code; MP.isHost = data.host_id === MY_UID;
+    MP.players = data.players; MP.turnActions = data.turn_actions || {};
+    selectedFactionId = myFid;
+    startMpGameClient(data.state);
+    startRoomPolling();
+    return;
+  }
+  enterLobby(code, data.host_id === MY_UID, data.players || {});
+}
+
+function enterLobby(code, isHost, players) {
+  MP.active = true; MP.roomCode = code; MP.isHost = isHost; MP.players = players;
+  document.getElementById('modeSelectBox').style.display = 'none';
+  document.getElementById('mpLobbyPanel').style.display = 'block';
+  document.getElementById('lobbyRoomCode').textContent = code;
+  renderLobby();
+  startRoomPolling();
+}
+
+function leaveMpRoom() {
+  stopRoomPolling();
+  MP.active = false; MP.roomCode = null;
+  document.getElementById('mpLobbyPanel').style.display = 'none';
+  document.getElementById('modeSelectBox').style.display = 'block';
+}
+
+function renderLobby() {
+  const list = document.getElementById('lobbyFactionList');
+  list.innerHTML = CONFIG.factions.map(f => {
+    const holder = MP.players[f.id];
+    const isMe = holder && holder.uid === MY_UID;
+    const isTaken = holder && !isMe;
+    return `
+      <div class="faction-pick-card ${isMe ? 'picked' : ''} ${isTaken ? 'taken' : ''}" onclick="${isTaken ? '' : `claimLobbyFaction('${f.id}')`}">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span><span class="pin-dot" style="background:${f.color}; width:9px; height:9px;"></span> <strong>${escapeHtml(f.name)}</strong></span>
+          ${isMe ? `<span class="badge gold">✅ 你已选 (${escapeHtml(holder.name)})</span>`
+            : isTaken ? `<span class="badge jade">👤 ${escapeHtml(holder.name)}</span>`
+            : `<span class="badge">🤖 电脑托管（点击认领）</span>`}
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${escapeHtml(f.desc || '')}</div>
+      </div>
+    `;
+  }).join('');
+
+  const ctrl = document.getElementById('lobbyHostControls');
+  const humanCount = Object.keys(MP.players).length;
+  if (MP.isHost) {
+    ctrl.innerHTML = `<button class="btn btn-primary btn-block" onclick="hostStartMpGame()">🎬 房主开局（当前 ${humanCount} 位真人 + ${CONFIG.factions.length - humanCount} 电脑托管）</button>`;
+  } else {
+    ctrl.innerHTML = `<div style="text-align:center; font-size:12px; color:var(--accent-gold); padding:8px;">⏳ 等待房主点击开始游戏...</div>`;
+  }
+}
+
+async function claimLobbyFaction(fid) {
+  const nextPlayers = { ...MP.players };
+  Object.keys(nextPlayers).forEach(k => { if (nextPlayers[k].uid === MY_UID) delete nextPlayers[k]; });
+  nextPlayers[fid] = { uid: MY_UID, name: MP.nickname };
+  MP.players = nextPlayers;
+  renderLobby();
+  await sb.from('game_rooms').update({ players: nextPlayers }).eq('room_code', MP.roomCode);
+}
+
+async function hostStartMpGame() {
+  const myFid = Object.keys(MP.players).find(fid => MP.players[fid].uid === MY_UID);
+  if (!myFid) return showToast('房主请先选择一个势力');
+  const initialState = createFreshGameState(myFid, MP.players);
+  await sb.from('game_rooms').update({
+    status: 'playing', state: initialState, turn_actions: {}, updated_at: new Date().toISOString()
+  }).eq('room_code', MP.roomCode);
+  selectedFactionId = myFid;
+  startMpGameClient(initialState);
+}
+
+function startMpGameClient(stateObj) {
+  GAME = stateObj;
+  GAME.playerFactionId = Object.keys(MP.players).find(fid => MP.players[fid].uid === MY_UID) || CONFIG.factions[0].id;
+  GAME.deployments = {};
+  GAME.deployCapBonus = 0;
+  GAME.recruitedTonight = false;
+  GAME.informantUsedTonight = false;
+  GAME.welfareBought = {};
+  rollMarketCandidates();
+  myLocalNight = GAME.night;
+  MP.myLocked = !!(MP.turnActions[GAME.playerFactionId]?.ready);
+
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'flex';
+  document.getElementById('btnTopRestart').style.display = MP.isHost ? 'inline-flex' : 'none';
+  renderAll();
+}
+
+function startRoomPolling() {
+  stopRoomPolling();
+  MP.pollTimer = setInterval(pollRoomOnce, 3000);
+}
+function stopRoomPolling() {
+  if (MP.pollTimer) { clearInterval(MP.pollTimer); MP.pollTimer = null; }
+}
+
+async function pollRoomOnce() {
+  if (!MP.active || !MP.roomCode || !cloudReady) return;
+  const { data, error } = await sb.from('game_rooms').select('*').eq('room_code', MP.roomCode).maybeSingle();
+  if (error || !data) return;
+
+  MP.players = data.players || {};
+  MP.turnActions = data.turn_actions || {};
+
+  if (data.status === 'lobby') {
+    renderLobby();
+    return;
+  }
+
+  if (data.status === 'playing' && !GAME) {
+    startMpGameClient(data.state);
+    return;
+  }
+
+  if (data.status === 'playing' && GAME) {
+    // 检测到房主推进到了下一晚或终局
+    if (data.state.night > myLocalNight || (data.state.gameOver && !GAME.gameOver)) {
+      const incomingExtras = data.state.lastExtras || [];
+      GAME = data.state;
+      GAME.playerFactionId = Object.keys(MP.players).find(fid => MP.players[fid].uid === MY_UID) || GAME.playerFactionId;
+      GAME.deployments = {};
+      GAME.deployCapBonus = 0;
+      GAME.recruitedTonight = false;
+      GAME.informantUsedTonight = false;
+      GAME.welfareBought = {};
+      rollMarketCandidates();
+      myLocalNight = GAME.night;
+      MP.myLocked = false;
+
+      if (GAME.gameOver) {
+        renderAll();
+        showEndGameModal(GAME.earlyWinnerId || null);
+      } else {
+        extraQueue = [...incomingExtras];
+        playNightCutscene(GAME.night, () => {
+          renderAll();
+          if (extraQueue.length) showNextExtra();
+        });
+      }
+      return;
+    }
+
+    // 房主检查是否全员锁定
+    const humanFids = Object.keys(MP.players);
+    const readyCount = humanFids.filter(fid => MP.turnActions[fid]?.ready).length;
+    renderMpStatusBar();
+    if (MP.isHost && !MP.resolving && humanFids.length > 0 && readyCount >= humanFids.length) {
+      hostResolveMpNight();
+    }
+  }
+}
+
+async function lockMyMpTurn() {
+  if (MP.myLocked) return;
+  const fid = GAME.playerFactionId;
+  const myFaction = GAME.factions[fid];
+  const myAgentsPatch = {};
+  Object.values(GAME.agents).filter(a => a.factionId === fid).forEach(a => {
+    myAgentsPatch[a.id] = { recruited: a.recruited, loyalty: a.loyalty, streak: a.streak, injury: a.injury, shieldTonight: a.shieldTonight };
+  });
+
+  const payload = {
+    ready: true,
+    deployments: GAME.deployments,
+    money: myFaction.money,
+    recruitedCount: myFaction.recruitedCount,
+    agentPatches: myAgentsPatch
+  };
+
+  // 读取最新 turn_actions 合并写入，防覆盖别人
+  const { data } = await sb.from('game_rooms').select('turn_actions').eq('room_code', MP.roomCode).maybeSingle();
+  const merged = { ...(data?.turn_actions || {}), [fid]: payload };
+  const { error } = await sb.from('game_rooms').update({ turn_actions: merged }).eq('room_code', MP.roomCode);
+  if (error) return showToast('提交失败：' + error.message);
+
+  MP.turnActions = merged;
+  MP.myLocked = true;
+  renderAll();
+  showToast('已锁定今晚部署，等待其他玩家...');
+  pollRoomOnce();
+}
+
+async function hostResolveMpNight() {
+  if (!MP.isHost || MP.resolving) return;
+  MP.resolving = true;
+  try {
+    const { data } = await sb.from('game_rooms').select('*').eq('room_code', MP.roomCode).maybeSingle();
+    const actions = data?.turn_actions || {};
+    const humanFids = Object.keys(MP.players);
+
+    // 将各真人玩家本回合的资金、招募、安家费、免伤、部署合并回权威 GAME
+    const humanDeployments = [];
+    humanFids.forEach(fid => {
+      const act = actions[fid];
+      if (!act) return;
+      if (typeof act.money === 'number') GAME.factions[fid].money = act.money;
+      if (typeof act.recruitedCount === 'number') GAME.factions[fid].recruitedCount = act.recruitedCount;
+      if (act.agentPatches) {
+        Object.entries(act.agentPatches).forEach(([aid, patch]) => {
+          if (GAME.agents[aid]) Object.assign(GAME.agents[aid], patch);
+        });
+      }
+      if (act.deployments) {
+        Object.entries(act.deployments).forEach(([aid, d]) => {
+          humanDeployments.push({ agentId: aid, factionId: fid, ...d });
+        });
+      }
+    });
+
+    runNightResolutionCore(humanDeployments, humanFids);
+    GAME.lastExtras = [...extraQueue];
+
+    await sb.from('game_rooms').update({
+      state: GAME, turn_actions: {}, updated_at: new Date().toISOString()
+    }).eq('room_code', MP.roomCode);
+
+    myLocalNight = GAME.night;
+    MP.myLocked = false;
+    MP.turnActions = {};
+    GAME.deployments = {};
+    GAME.deployCapBonus = 0;
+    GAME.recruitedTonight = false;
+    GAME.informantUsedTonight = false;
+    GAME.welfareBought = {};
+    rollMarketCandidates();
+
+    if (GAME.gameOver) {
+      renderAll();
+      showEndGameModal(GAME.earlyWinnerId || null);
+    } else {
+      playNightCutscene(GAME.night, () => {
+        renderAll();
+        if (extraQueue.length) showNextExtra();
+      });
+    }
+  } finally {
+    MP.resolving = false;
+  }
+}
+
+/* =========================================================================
+   4. 游戏状态初始化与单人开局
+   ========================================================================= */
+function createFreshGameState(playerFactionId, mpPlayers = null) {
+  const factionsState = {};
+  const agentsState = {};
+  const landmarksState = {};
+
+  CONFIG.factions.forEach(f => {
+    factionsState[f.id] = { id: f.id, money: 120, recruitedCount: 0, isPlayer: mpPlayers ? !!mpPlayers[f.id] : f.id === playerFactionId };
+    const pool = CONFIG.agents.filter(a => a.factionId === f.id);
+    pool.forEach((a, idx) => {
+      agentsState[a.id] = { ...a, skills: [...(a.skills || [])], recruited: idx < 2, loyalty: a.loyalty, streak: 0, injury: 0, shieldTonight: false };
+    });
+  });
+
+  CONFIG.landmarks.forEach(l => {
+    landmarksState[l.id] = { id: l.id, owner: l.defaultOwner || null, control: l.defaultOwner ? 60 : 20, hadBattle: false, flipped: false };
+  });
+
+  const shuffledWelfare = [...WELFARE_POOL].sort(() => Math.random() - 0.5).slice(0, 2);
+  return {
+    night: 1, maxNights: 15, playerFactionId,
+    factions: factionsState, agents: agentsState, landmarks: landmarksState,
+    deployments: {}, deployCapBonus: 0,
+    hotspotId: pickRandomLandmarkId(), nextHotspotId: pickRandomLandmarkId(),
+    informantUsedTonight: false, recruitedTonight: false,
+    marketCandidates: [], welfareTonight: shuffledWelfare, welfareBought: {},
+    logs: [], triggeredStories: [], lastExtras: [], gameOver: false, earlyWinnerId: null
+  };
+}
+
+function pickRandomLandmarkId() {
+  return CONFIG.landmarks[Math.floor(Math.random() * CONFIG.landmarks.length)].id;
+}
+
+function confirmStartSolo() {
+  MP.active = false;
+  GAME = createFreshGameState(selectedFactionId);
+  rollMarketCandidates();
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'flex';
+  document.getElementById('btnTopRestart').style.display = 'inline-flex';
+  renderAll();
+  if (!localStorage.getItem('gww_v3_guide_seen')) {
+    localStorage.setItem('gww_v3_guide_seen', '1');
+    openGuideModal();
+  }
+}
+
+function confirmRestart() {
+  if (confirm('确定重新开始本局吗？（保留所有GM配置）')) restartGame();
+}
+async function restartGame() {
+  closeModal('endModal');
+  if (MP.active && MP.isHost) {
+    await hostStartMpGame();
+    showToast('已重置联机战局');
+  } else if (!MP.active) {
+    GAME = createFreshGameState(GAME ? GAME.playerFactionId : selectedFactionId);
+    rollMarketCandidates();
+    switchTab('deploy');
+    renderAll();
+    showToast('已重置战局');
+  }
+}
+
+/* =========================================================================
+   5. 核心渲染与交互
+   ========================================================================= */
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function checkGmEntrance() {
+  const visible = GM_URL_KEYS.some(k => (location.search + location.hash).includes(k));
+  document.getElementById('startGmBtn').style.display = visible ? 'inline-flex' : 'none';
+  document.getElementById('topGmBtn').style.display = visible ? 'inline-flex' : 'none';
+}
+function renderStartScreen() {
+  document.getElementById('factionPickList').innerHTML = CONFIG.factions.map(f => {
+    const hq = CONFIG.landmarks.find(l => l.id === f.hq);
+    const count = CONFIG.agents.filter(a => a.factionId === f.id).length;
+    return `
+      <div class="faction-pick-card ${selectedFactionId === f.id ? 'picked' : ''}" onclick="selectedFactionId='${f.id}';renderStartScreen()">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span><span class="pin-dot" style="background:${f.color}; width:10px; height:10px;"></span> <strong>${escapeHtml(f.name)}</strong></span>
+          <span class="badge">${hq ? escapeHtml(hq.name) : ''} · 池${count}人</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(f.desc || '')}</div>
+      </div>`;
+  }).join('');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderAll();
+}
+
+function calcFactionScore(fid) {
+  const f = GAME.factions[fid];
+  let owned = 0, ctrl = 0;
+  Object.values(GAME.landmarks).forEach(l => { if (l.owner === fid) { owned++; ctrl += l.control; } });
+  return { fid, owned, money: f.money, ctrl, score: owned * 100 + Math.floor(f.money / 10) + ctrl };
+}
+function getWantedFactionId() {
+  const ranks = CONFIG.factions.map(f => calcFactionScore(f.id)).sort((a, b) => b.score - a.score);
+  return ranks[0].score > 0 ? ranks[0].fid : null;
+}
+function getAgentSkills(agent) { return (agent.skills || []).map(sid => CONFIG.skills.find(s => s.id === sid)).filter(Boolean); }
+function isAgentFatigued(agent) {
+  const easy = getAgentSkills(agent).some(s => s.trigger === 'passive' && s.effectType === 'easy_fatigue');
+  return agent.streak >= (easy ? 1 : 2);
+}
+
+function renderAll() {
+  if (!GAME) return;
+  const pf = GAME.factions[GAME.playerFactionId];
+  const myScore = calcFactionScore(GAME.playerFactionId);
+  document.getElementById('statNight').textContent = `第${GAME.night}/${GAME.maxNights}晚`;
+  document.getElementById('statMoney').textContent = `$${pf.money}`;
+  document.getElementById('statLandmarks').textContent = `${myScore.owned}/${CONFIG.landmarks.length}`;
+  document.getElementById('statDeploy').textContent = `${Object.keys(GAME.deployments).length}/${3 + GAME.deployCapBonus}`;
+
+  renderMpStatusBar();
+  renderWantedBanner();
+  renderMap();
+  renderSettleBar();
+  renderRoster();
+  renderMarket();
+  renderWelfare();
+  renderNews();
+}
+
+function renderMpStatusBar() {
+  const bar = document.getElementById('mpStatusBar');
+  if (!MP.active) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const humanFids = Object.keys(MP.players);
+  const readyCount = humanFids.filter(fid => MP.turnActions[fid]?.ready).length;
+  bar.innerHTML = `
+    <span>🌐 房间 <strong class="mono">${MP.roomCode}</strong></span>
+    <span>已锁定：<strong>${readyCount}/${humanFids.length}</strong> ${MP.myLocked ? '(你已锁定)' : ''}</span>
+  `;
+}
+
+function renderSettleBar() {
+  const bar = document.getElementById('settleBar');
+  if (!MP.active) {
+    bar.innerHTML = `<button class="btn btn-primary btn-block" onclick="endNightSolo()">🌙 结束今晚部署 · 进入结算</button>`;
+  } else {
+    bar.innerHTML = `
+      <button class="btn ${MP.myLocked ? '' : 'btn-primary'} btn-block" ${MP.myLocked ? 'disabled' : ''} onclick="lockMyMpTurn()">
+        ${MP.myLocked ? '⏳ 已锁定部署，等待其他群友...' : '🔒 锁定今晚部署'}
+      </button>
+      ${MP.isHost ? `<button class="btn btn-sm" onclick="if(confirm('不等未锁定玩家，直接推进今晚结算？')) hostResolveMpNight()">⚡ 房主强制推进今晚</button>` : ''}
+    `;
+  }
+}
+
+function renderWantedBanner() {
+  const wf = CONFIG.factions.find(f => f.id === getWantedFactionId());
+  const hot = CONFIG.landmarks.find(l => l.id === GAME.hotspotId);
+  document.getElementById('wantedBanner').innerHTML = `
+    <span>🎯 头号通缉：<strong>${wf ? escapeHtml(wf.name) : '无'}</strong>（战败多抢$50）</span>
+    <span>${renderIcon(UI_ICONS.hotspot)} 热点：<strong>${hot ? escapeHtml(hot.name) : ''}</strong></span>
+  `;
+  const hint = document.getElementById('deployHint');
+  if (selectedAgentId && GAME.agents[selectedAgentId]) {
+    hint.innerHTML = `<span>✅ 已选中 <strong>${escapeHtml(GAME.agents[selectedAgentId].name)}</strong>，请点地图图钉派驻</span><button class="icon-btn" onclick="selectedAgentId=null;renderAll()">取消</button>`;
+  } else {
+    hint.innerHTML = `<span>👉 先点下方干员，再点地图图钉派驻（每晚限 ${3 + GAME.deployCapBonus} 人）</span>`;
+  }
+}
+
+function renderMap() {
+  document.getElementById('mapBox').style.backgroundImage = CONFIG.mapImage ? `url('${CONFIG.mapImage}')` : 'none';
+  document.getElementById('mapPinsLayer').innerHTML = CONFIG.landmarks.map(l => {
+    const st = GAME.landmarks[l.id];
+    const owner = CONFIG.factions.find(f => f.id === st.owner);
+    const myDeployed = Object.entries(GAME.deployments).filter(([, d]) => d.landmarkId === l.id)
+      .map(([aid, d]) => `${GAME.agents[aid].name}(${ACTION_META[d.action].name.slice(0,2)})`);
+    let flags = '';
+    if (GAME.hotspotId === l.id) flags += renderIcon(UI_ICONS.hotspot);
+    if (st.hadBattle) flags += renderIcon(UI_ICONS.battle);
+    if (st.flipped) flags += renderIcon(UI_ICONS.flip);
+    return `
+      <div class="map-pin ${selectedAgentId ? 'target-ready' : ''}" style="left:${l.x}%; top:${l.y}%; border-color:${owner ? owner.color : 'rgba(255,255,255,0.28)'};" onclick="onTapLandmark('${l.id}')">
+        <div class="pin-flags">${flags}</div>
+        <div class="pin-name"><span class="pin-dot" style="background:${owner ? owner.color : '#888'}"></span><span>${escapeHtml(l.name)}</span></div>
+        <div class="pin-meta">${owner ? escapeHtml(owner.name) : '中立'} · ${st.control}%</div>
+        ${myDeployed.length ? `<div class="pin-deployed">▸ ${escapeHtml(myDeployed.join('、'))}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderRoster() {
+  const myAgents = Object.values(GAME.agents).filter(a => a.factionId === GAME.playerFactionId && a.recruited);
+  document.getElementById('rosterCountBadge').textContent = `${myAgents.length}人`;
+  document.getElementById('rosterList').innerHTML = myAgents.map(a => {
+    const role = ROLE_META[a.role] || ROLE_META.combat;
+    const dep = GAME.deployments[a.id];
+    const skills = getAgentSkills(a);
+    const lmName = dep ? CONFIG.landmarks.find(l => l.id === dep.landmarkId)?.name : '';
+    return `
+      <div class="agent-card ${selectedAgentId === a.id ? 'selected' : ''} ${dep ? 'deployed' : ''} ${a.injury > 0 ? 'injured' : ''}" onclick="onTapAgent('${a.id}')">
+        <div class="agent-top">
+          <div class="agent-avatar">${a.avatar ? `<img src="${escapeAttr(a.avatar)}">` : renderIcon(role.icon())}</div>
+          <div class="agent-info">
+            <div class="agent-name-row">
+              <span class="agent-name">${escapeHtml(a.name)}</span>
+              <span class="badge gold">${renderIcon(role.icon())} ${role.name}</span>
+              ${a.injury > 0 ? `<span class="badge crimson">🏥 住院/拘留 ${a.injury}晚</span>` : ''}
+              ${isAgentFatigued(a) && a.injury === 0 ? `<span class="badge amber">😫 疲劳(-15%)</span>` : ''}
+              ${a.shieldTonight ? `<span class="badge jade">🛡️ 免伤</span>` : ''}
+              ${a.loyalty < 30 ? `<span class="badge crimson">⚠️ 叛变风险</span>` : ''}
+            </div>
+            <div class="agent-stats"><span>行动值 <strong>${a.power}</strong></span><span>忠诚 <strong>${a.loyalty}</strong></span><span>连出 <strong>${a.streak}</strong>晚</span></div>
+          </div>
+        </div>
+        ${a.quote ? `<div class="agent-quote">“${escapeHtml(a.quote)}”</div>` : ''}
+        ${skills.length ? `<div class="skill-tags">${skills.map(s => `<span class="skill-tag ${s.value < 0 ? 'neg' : ''}">${escapeHtml(s.name)}：${escapeHtml(s.desc)}</span>`).join('')}</div>` : ''}
+        <div class="agent-footer" onclick="event.stopPropagation()">
+          <div>${dep ? `<span class="badge jade">已派往 ${escapeHtml(lmName)} · ${ACTION_META[dep.action].name}</span>` : `<span style="font-size:11px; color:var(--text-muted);">${a.injury > 0 ? '养伤中' : '待命中'}</span>`}</div>
+          <div style="display:flex; gap:5px;">
+            ${dep && !MP.myLocked ? `<button class="btn btn-sm" onclick="delete GAME.deployments['${a.id}'];renderAll()">撤回</button>` : ''}
+            <button class="btn btn-sm" ${MP.myLocked ? 'disabled' : ''} onclick="giveAllowance('${a.id}')">安家费 $30</button>
+            ${a.injury > 0 ? `<button class="btn btn-sm btn-jade" ${MP.myLocked ? 'disabled' : ''} onclick="bailAgent('${a.id}')">捞人 $50</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function onTapAgent(aid) {
+  if (MP.myLocked) return showToast('你已锁定今晚部署');
+  const a = GAME.agents[aid];
+  if (!a || a.injury > 0) return showToast('该干员正在住院/拘留，无法出勤');
+  selectedAgentId = selectedAgentId === aid ? null : aid;
+  if (selectedAgentId) document.getElementById('mapBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  renderAll();
+}
+
+function onTapLandmark(lid) {
+  if (MP.myLocked) return showToast('你已锁定今晚部署');
+  if (!selectedAgentId) {
+    const l = CONFIG.landmarks.find(x => x.id === lid);
+    const st = GAME.landmarks[lid];
+    const owner = CONFIG.factions.find(f => f.id === st.owner);
+    return showToast(`${l.name}（${owner ? owner.name : '中立'} · ${st.control}%）— 请先点选干员`);
+  }
+  const cap = 3 + GAME.deployCapBonus;
+  if (!GAME.deployments[selectedAgentId] && Object.keys(GAME.deployments).length >= cap) return showToast(`今晚出勤已达上限（${cap}人）`);
+  pendingDeployLandmarkId = lid;
+  const ag = GAME.agents[selectedAgentId], lm = CONFIG.landmarks.find(x => x.id === lid);
+  document.getElementById('actionModalTitle').textContent = `指派 ${ag.name} → ${lm.name}`;
+  document.getElementById('actionModalSub').textContent = `${ROLE_META[ag.role].name}（${ROLE_META[ag.role].desc}）`;
+  document.getElementById('actionButtons').innerHTML = Object.entries(ACTION_META).map(([k, m]) => `
+    <button class="btn" style="justify-content:flex-start; text-align:left; padding:11px 12px;" onclick="GAME.deployments[selectedAgentId]={landmarkId:pendingDeployLandmarkId,action:'${k}'};selectedAgentId=null;closeModal('actionModal');renderAll()">
+      <span style="font-size:18px;">${renderIcon(m.icon())}</span>
+      <div><div style="font-weight:700;">${m.name}</div><div style="font-size:11px; color:var(--text-muted); font-weight:400;">${m.desc}</div></div>
+    </button>`).join('');
+  openModal('actionModal');
+}
+
+/* =========================================================================
+   6. 人才市场、福利、常规消费
+   ========================================================================= */
+function getRecruitCost() { return 90 + GAME.factions[GAME.playerFactionId].recruitedCount * 25; }
+function rollMarketCandidates() {
+  const pool = Object.values(GAME.agents).filter(a => a.factionId === GAME.playerFactionId && !a.recruited);
+  GAME.marketCandidates = [...pool].sort(() => Math.random() - 0.5).slice(0, 2).map(a => a.id);
+}
+function renderMarket() {
+  const cost = getRecruitCost();
+  const rem = Object.values(GAME.agents).filter(a => a.factionId === GAME.playerFactionId && !a.recruited).length;
+  document.getElementById('marketMeta').innerHTML = `当前招募价：<strong class="mono" style="color:var(--accent-gold);">$${cost}</strong> · 未招募池剩余 <strong>${rem}</strong> 人`;
+  document.getElementById('btnRefreshMarket').disabled = GAME.recruitedTonight || rem <= 2 || MP.myLocked;
+  const list = document.getElementById('marketList');
+  if (GAME.recruitedTonight) { list.innerHTML = `<div style="text-align:center; padding:14px; color:var(--text-muted);">今晚已招募过干员。</div>`; return; }
+  if (!GAME.marketCandidates.length) { list.innerHTML = `<div style="text-align:center; padding:14px; color:var(--text-muted);">本组织人才池已招满！</div>`; return; }
+  list.innerHTML = GAME.marketCandidates.map(aid => {
+    const a = GAME.agents[aid]; if (!a || a.recruited) return '';
+    const role = ROLE_META[a.role] || ROLE_META.combat;
+    return `
+      <div class="agent-card">
+        <div class="agent-top">
+          <div class="agent-avatar">${a.avatar ? `<img src="${escapeAttr(a.avatar)}">` : renderIcon(role.icon())}</div>
+          <div class="agent-info">
+            <div class="agent-name-row"><span class="agent-name">${escapeHtml(a.name)}</span><span class="badge gold">${role.name}</span></div>
+            <div class="agent-stats"><span>行动值 <strong>${a.power}</strong></span><span>忠诚 <strong>${a.loyalty}</strong></span></div>
+          </div>
+          <button class="btn btn-primary btn-sm" ${MP.myLocked ? 'disabled' : ''} onclick="recruitAgent('${a.id}')">招募 $${cost}</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+function refreshMarket() {
+  const pf = GAME.factions[GAME.playerFactionId];
+  if (pf.money < 30) return showToast('资金不足 $30');
+  pf.money -= 30; rollMarketCandidates(); renderAll(); showToast('已刷新候选人');
+}
+function recruitAgent(aid) {
+  const pf = GAME.factions[GAME.playerFactionId], cost = getRecruitCost();
+  if (pf.money < cost) return showToast(`资金不足 $${cost}`);
+  const ag = GAME.agents[aid];
+  pf.money -= cost; pf.recruitedCount++; ag.recruited = true; GAME.recruitedTonight = true;
+  getAgentSkills(ag).filter(s => s.trigger === 'on_recruit').forEach(s => {
+    if (s.effectType === 'money') pf.money = Math.max(0, pf.money + Number(s.value));
+    if (s.effectType === 'loyalty_all') Object.values(GAME.agents).filter(x => x.factionId === pf.id && x.recruited).forEach(x => x.loyalty = clamp(x.loyalty + Number(s.value), 0, 100));
+  });
+  addLog(`招募了新干员「${ag.name}」（$${cost}）。`, 'good');
+  renderAll(); showToast(`成功招募 ${ag.name}！`);
+}
+function renderWelfare() {
+  document.getElementById('welfareList').innerHTML = (GAME.welfareTonight || []).map(w => {
+    const bought = !!GAME.welfareBought[w.id];
+    return `
+      <div class="agent-card" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div><div style="font-weight:700; color:var(--accent-gold);">${escapeHtml(w.name)}</div><div style="font-size:12px; color:var(--text-muted);">${escapeHtml(w.desc)}</div></div>
+        <button class="btn btn-sm ${bought ? '' : 'btn-primary'}" ${bought || MP.myLocked ? 'disabled' : ''} onclick="buyWelfare('${w.id}')">${bought ? '已购' : '$' + w.cost}</button>
+      </div>`;
+  }).join('');
+  document.getElementById('informantResult').textContent = GAME.informantUsedTonight ? `👁️ 线人密报：明晚热点地标将是「${CONFIG.landmarks.find(l => l.id === GAME.nextHotspotId)?.name}」` : '';
+}
+function buyWelfare(wid) {
+  const w = WELFARE_POOL.find(x => x.id === wid), pf = GAME.factions[GAME.playerFactionId];
+  if (pf.money < w.cost) return showToast(`资金不足 $${w.cost}`);
+  if (w.needTarget === 'none') {
+    pf.money -= w.cost; GAME.welfareBought[wid] = true; GAME.deployCapBonus++;
+    renderAll(); return showToast('今晚出勤上限 +1！');
+  }
+  pendingWelfare = w;
+  const list = Object.values(GAME.agents).filter(a => a.factionId === GAME.playerFactionId && a.recruited && (w.needTarget === 'any' || a.injury === 0));
+  document.getElementById('targetAgentTitle').textContent = `使用 ${w.name}（$${w.cost}）`;
+  document.getElementById('targetAgentList').innerHTML = list.map(a => `
+    <div class="agent-card" style="display:flex; justify-content:space-between; align-items:center;" onclick="applyWelfareToAgent('${a.id}')">
+      <span><strong>${escapeHtml(a.name)}</strong> (忠诚${a.loyalty} · 连出${a.streak}晚)</span><span class="badge gold">选择</span>
+    </div>`).join('');
+  openModal('targetAgentModal');
+}
+function applyWelfareToAgent(aid) {
+  const w = pendingWelfare, pf = GAME.factions[GAME.playerFactionId], ag = GAME.agents[aid];
+  pf.money -= w.cost; GAME.welfareBought[w.id] = true;
+  if (w.id === 'w1') ag.streak = 0;
+  if (w.id === 'w2') ag.shieldTonight = true;
+  if (w.id === 'w3') ag.loyalty = clamp(ag.loyalty + 20, 0, 100);
+  closeModal('targetAgentModal'); renderAll(); showToast(`已对 ${ag.name} 生效`);
+}
+function giveAllowance(aid) {
+  const pf = GAME.factions[GAME.playerFactionId];
+  if (pf.money < 30) return showToast('资金不足 $30');
+  pf.money -= 30; GAME.agents[aid].loyalty = clamp(GAME.agents[aid].loyalty + 15, 0, 100);
+  renderAll(); showToast('忠诚 +15');
+}
+function bailAgent(aid) {
+  const pf = GAME.factions[GAME.playerFactionId];
+  if (pf.money < 50) return showToast('资金不足 $50');
+  pf.money -= 50; GAME.agents[aid].injury = Math.max(0, GAME.agents[aid].injury - 1);
+  renderAll(); showToast('恢复时间 -1 晚');
+}
+function buyInformant() {
+  const pf = GAME.factions[GAME.playerFactionId];
+  if (GAME.informantUsedTonight || MP.myLocked) return;
+  if (pf.money < 40) return showToast('资金不足 $40');
+  pf.money -= 40; GAME.informantUsedTonight = true; renderAll(); showToast('已获取明晚热点密报');
+}
+
+/* =========================================================================
+   7. 核心结算引擎（单人 & 联机房主共用）
+   ========================================================================= */
+function endNightSolo() {
+  if (GAME.gameOver) return;
+  const humanDeployments = Object.entries(GAME.deployments).map(([aid, d]) => ({ agentId: aid, factionId: GAME.playerFactionId, ...d }));
+  runNightResolutionCore(humanDeployments, [GAME.playerFactionId]);
+  GAME.deployments = {}; GAME.deployCapBonus = 0; GAME.recruitedTonight = false; GAME.informantUsedTonight = false; GAME.welfareBought = {};
+  rollMarketCandidates();
+  if (GAME.gameOver) { renderAll(); showEndGameModal(GAME.earlyWinnerId || null); return; }
+  playNightCutscene(GAME.night, () => { renderAll(); if (extraQueue.length) showNextExtra(); });
+}
+
+function runNightResolutionCore(humanDeployments, humanFids) {
+  Object.values(GAME.landmarks).forEach(l => { l.hadBattle = false; l.flipped = false; });
+  const allDeployments = [...humanDeployments];
+
+  // 未被真人认领的组织由纯代码「电脑托管」
+  CONFIG.factions.filter(f => !humanFids.includes(f.id)).forEach(f => {
+    const fState = GAME.factions[f.id];
+    const botCost = 90 + fState.recruitedCount * 25;
+    if (fState.money >= botCost + 40) {
+      const pool = Object.values(GAME.agents).filter(a => a.factionId === f.id && !a.recruited);
+      if (pool.length) {
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        fState.money -= botCost; fState.recruitedCount++; pick.recruited = true;
+      }
+    }
+    const avail = Object.values(GAME.agents).filter(a => a.factionId === f.id && a.recruited && a.injury === 0);
+    [...avail].sort((a, b) => (a.streak - b.streak) || (b.power - a.power)).slice(0, 3).forEach(ag => {
+      const targetLm = Math.random() < 0.4 ? GAME.hotspotId : pickRandomLandmarkId();
+      const acts = ag.role === 'resource' ? ['trade','trade','patrol'] : ag.role === 'strategy' ? ['intel','patrol','trade'] : ['fight','patrol','fight'];
+      allDeployments.push({ agentId: ag.id, factionId: f.id, landmarkId: targetLm, action: acts[Math.floor(Math.random() * acts.length)] });
+    });
+  });
+
+  const deployedSet = new Set(allDeployments.map(d => d.agentId));
+  const wantedId = getWantedFactionId();
+  extraQueue = [];
+
+  allDeployments.forEach(d => {
+    const ag = GAME.agents[d.agentId], fState = GAME.factions[d.factionId];
+    if (isAgentFatigued(ag)) ag.loyalty = clamp(ag.loyalty - 5, 0, 100);
+    getAgentSkills(ag).filter(s => s.trigger === 'on_deploy').forEach(s => {
+      if (s.effectType === 'money') fState.money = Math.max(0, fState.money + Number(s.value));
+      if (s.effectType === 'loyalty') ag.loyalty = clamp(ag.loyalty + Number(s.value), 0, 100);
+    });
+  });
+
+  CONFIG.landmarks.forEach(lm => {
+    const lmState = GAME.landmarks[lm.id];
+    const list = allDeployments.filter(d => d.landmarkId === lm.id);
+    if (!list.length) return;
+    const isHot = GAME.hotspotId === lm.id;
+
+    const duoBonus = new Set();
+    CONFIG.stories.filter(st => st.type === 'encounter').forEach(st => {
+      if (list.some(d => d.agentId === st.agent1) && list.some(d => d.agentId === st.agent2)) {
+        duoBonus.add(st.agent1); duoBonus.add(st.agent2);
+        if (!GAME.triggeredStories.includes(st.id)) {
+          GAME.triggeredStories.push(st.id);
+          applyStoryEffect(st, humanFids);
+          extraQueue.push({ meta: `第${GAME.night}晚 · 特别相遇`, title: st.title, body: st.body, effect: formatEffectDesc(st.effectType, st.effectValue) });
+        }
+      }
+    });
+
+    const entries = list.map(d => {
+      const ag = GAME.agents[d.agentId];
+      let eff = ag.power;
+      if (isAgentFatigued(ag)) eff *= 0.85;
+      if (duoBonus.has(ag.id)) eff *= 1.10;
+      if (ag.role === 'combat' && (d.action === 'fight' || d.action === 'patrol')) eff *= 1.25;
+      if (ag.role === 'resource' && d.action === 'trade') eff *= 1.30;
+      if (ag.role === 'strategy' && d.action === 'intel') eff *= 1.20;
+      getAgentSkills(ag).forEach(s => {
+        if (s.trigger === 'passive' && s.effectType === 'power_pct') eff *= (1 + Number(s.value) / 100);
+        if (s.trigger === 'on_streak' && s.effectType === 'power_pct') eff *= (1 + (ag.streak * Number(s.value)) / 100);
+        if (s.trigger === 'on_action' && s.param === d.action && s.effectType === 'power_pct') eff *= (1 + Number(s.value) / 100);
+        if (s.trigger === 'on_landmark' && s.param === lm.id && s.effectType === 'power_pct') eff *= (1 + Number(s.value) / 100);
+      });
+      return { ...d, ag, eff: Math.round(eff), tradeGain: 0 };
+    });
+
+    entries.forEach(e => {
+      const fState = GAME.factions[e.factionId];
+      if (e.action === 'trade') {
+        const gain = Math.round(e.eff * 0.55) * (isHot ? 2 : 1);
+        e.tradeGain = gain; fState.money += gain;
+      } else if (e.action === 'intel') {
+        fState.money += Math.round(e.eff * (e.ag.role === 'strategy' ? 0.35 : 0.2));
+        const enemyPatrol = entries.some(o => o.factionId !== e.factionId && o.action === 'patrol');
+        const drop = (e.ag.role === 'strategy' ? 14 : 8) + (enemyPatrol ? 15 : 0);
+        if (lmState.owner && lmState.owner !== e.factionId) lmState.control = Math.max(0, lmState.control - drop);
+      } else if (e.action === 'patrol' && lmState.owner === e.factionId) {
+        lmState.control = Math.min(100, lmState.control + Math.round(12 * (isHot ? 1.5 : 1)));
+      }
+    });
+
+    const factionsHere = [...new Set(entries.map(e => e.factionId))];
+    const hasFight = entries.some(e => e.action === 'fight');
+    if (factionsHere.length >= 2 && hasFight) {
+      lmState.hadBattle = true;
+      const scores = factionsHere.map(fid => {
+        const my = entries.filter(e => e.factionId === fid);
+        const total = my.reduce((sum, e) => sum + (e.action === 'patrol' ? e.eff * 1.2 : e.eff), 0) + Math.floor(Math.random() * 12);
+        return { fid, total, members: my };
+      }).sort((a, b) => b.total - a.total);
+      const winner = scores[0], losers = scores.slice(1), winF = GAME.factions[winner.fid];
+
+      losers.forEach(lo => {
+        const loF = GAME.factions[lo.fid];
+        lo.members.forEach(m => {
+          if (m.action === 'trade' && m.tradeGain > 0 && winner.members.some(w => w.action === 'fight')) {
+            const rob = Math.floor(m.tradeGain / 2); loF.money = Math.max(0, loF.money - rob); winF.money += rob;
+          }
+          const immune = getAgentSkills(m.ag).some(s => s.trigger === 'on_lose' && s.effectType === 'immune_injury');
+          if (!m.ag.shieldTonight && !immune && Math.random() < 0.55) m.ag.injury = 2;
+        });
+        if (lo.fid === wantedId) { const b = Math.min(50, loF.money); loF.money -= b; winF.money += b; }
+      });
+      winner.members.forEach(w => getAgentSkills(w.ag).filter(s => s.trigger === 'on_win' && s.effectType === 'money').forEach(s => winF.money = Math.max(0, winF.money + Number(s.value))));
+
+      const delta = Math.round(28 * (isHot ? 1.5 : 1));
+      if (lmState.owner === winner.fid) lmState.control = Math.min(100, lmState.control + delta);
+      else { lmState.control -= delta; if (lmState.control <= 0) { lmState.owner = winner.fid; lmState.control = 45; lmState.flipped = true; } }
+      addLog(`⚔️ ${lm.name} 爆发激战！「${CONFIG.factions.find(f => f.id === winner.fid)?.name}」胜出${lmState.flipped ? '，地标易主！' : '。'}`, 'battle');
+    } else if (hasFight) {
+      const fOne = entries.find(e => e.action === 'fight');
+      const delta = Math.round(25 * (isHot ? 1.5 : 1));
+      if (lmState.owner === fOne.factionId) lmState.control = Math.min(100, lmState.control + delta);
+      else { lmState.control -= delta; if (lmState.control <= 0) { lmState.owner = fOne.factionId; lmState.control = 40; lmState.flipped = true; addLog(`🚩「${CONFIG.factions.find(f => f.id === fOne.factionId)?.name}」接管了 ${lm.name}！`, 'good'); } }
+    }
+  });
+
+  Object.values(GAME.agents).forEach(ag => {
+    ag.shieldTonight = false;
+    if (!ag.recruited) return;
+    if (ag.injury > 0) { ag.injury = Math.max(0, ag.injury - 1); ag.streak = 0; return; }
+    ag.streak = deployedSet.has(ag.id) ? ag.streak + 1 : 0;
+    getAgentSkills(ag).filter(s => s.trigger === 'passive' && s.effectType === 'loyalty_night').forEach(s => ag.loyalty = clamp(ag.loyalty + Number(s.value), 0, 100));
+    const immuneD = getAgentSkills(ag).some(s => s.trigger === 'passive' && s.effectType === 'immune_defect');
+    if (humanFids.includes(ag.factionId) && ag.loyalty < 30 && !immuneD && Math.random() < 0.35) {
+      const others = CONFIG.factions.filter(f => f.id !== ag.factionId);
+      const newF = others[Math.floor(Math.random() * others.length)];
+      ag.factionId = newF.id; ag.loyalty = 70; ag.streak = 0;
+      extraQueue.push({ meta: `第${GAME.night}晚 · 叛变号外`, title: `惊天倒戈！${ag.name} 过档「${newF.name}」`, body: `因长期不满，${ag.name} 今夜投奔「${newF.name}」。`, effect: `${ag.name} 已叛变` });
+      addLog(`⚠️ ${ag.name} 叛变过档「${newF.name}」！`, 'battle');
+    }
+  });
+
+  CONFIG.stories.filter(st => st.type === 'timed' && Number(st.night) === GAME.night).forEach(st => {
+    if (!GAME.triggeredStories.includes(st.id)) {
+      GAME.triggeredStories.push(st.id); applyStoryEffect(st, humanFids);
+      extraQueue.push({ meta: `第${GAME.night}晚 · 定时事件`, title: st.title, body: st.body, effect: formatEffectDesc(st.effectType, st.effectValue) });
+    }
+  });
+  if (CONFIG.extras.length && Math.random() < 0.35) {
+    const ex = CONFIG.extras[Math.floor(Math.random() * CONFIG.extras.length)];
+    applyStoryEffect(ex, humanFids);
+    extraQueue.push({ meta: `第${GAME.night}晚 · 随机号外`, title: ex.title, body: ex.body, effect: formatEffectDesc(ex.effectType, ex.effectValue) });
+  }
+
+  const winnerEarly = CONFIG.factions.find(f => calcFactionScore(f.id).owned >= 4);
+  if (winnerEarly || GAME.night >= GAME.maxNights) {
+    GAME.gameOver = true; GAME.earlyWinnerId = winnerEarly ? winnerEarly.id : null; return;
+  }
+
+  GAME.night += 1;
+  GAME.hotspotId = GAME.nextHotspotId;
+  GAME.nextHotspotId = pickRandomLandmarkId();
+  GAME.welfareTonight = [...WELFARE_POOL].sort(() => Math.random() - 0.5).slice(0, 2);
+}
+
+function applyStoryEffect(item, humanFids) {
+  const val = Number(item.effectValue || 0); if (!val) return;
+  if (item.effectType === 'money' || item.effectType === 'player_money') humanFids.forEach(fid => GAME.factions[fid].money = Math.max(0, GAME.factions[fid].money + val));
+  else if (item.effectType === 'all_money') Object.values(GAME.factions).forEach(f => f.money = Math.max(0, f.money + val));
+  else if (item.effectType === 'loyalty' || item.effectType === 'player_loyalty') Object.values(GAME.agents).filter(a => humanFids.includes(a.factionId) && a.recruited).forEach(a => a.loyalty = clamp(a.loyalty + val, 0, 100));
+}
+function formatEffectDesc(type, val) {
+  const n = Number(val || 0); if (!n || type === 'none') return '';
+  const s = n > 0 ? '+' : '';
+  if (type === 'money' || type === 'player_money') return `效果：玩家势力资金 ${s}$${n}`;
+  if (type === 'all_money') return `效果：全城各势力资金 ${s}$${n}`;
+  if (type === 'loyalty' || type === 'player_loyalty') return `效果：玩家全员忠诚 ${s}${n}`;
+  return '';
+}
+
+/* =========================================================================
+   8. 演出、晚报、排行榜、GM后台
+   ========================================================================= */
+function playNightCutscene(nightNum, done) {
+  const mask = document.getElementById('cutsceneMask'), textEl = document.getElementById('cutsceneText');
+  const pool = CONFIG.cutsceneTexts.length ? CONFIG.cutsceneTexts : ['霓虹初上，今夜风声又紧了几分。'];
+  const line = pool[Math.floor(Math.random() * pool.length)];
+  document.getElementById('cutsceneNight').textContent = `第 ${nightNum} 晚`;
+  textEl.textContent = ''; mask.classList.add('show');
+  let i = 0; const timer = setInterval(() => { textEl.textContent += line[i] || ''; if (++i >= line.length) clearInterval(timer); }, Math.max(35, Math.floor(1100 / Math.max(1, line.length))));
+  setTimeout(() => { clearInterval(timer); mask.classList.remove('show'); done && done(); }, 2000);
+}
+function showNextExtra() {
+  if (!extraQueue.length) return;
+  const item = extraQueue.shift();
+  document.getElementById('extraMeta').textContent = item.meta;
+  document.getElementById('extraTitle').textContent = item.title;
+  document.getElementById('extraBody').textContent = item.body;
+  const eff = document.getElementById('extraEffect');
+  eff.style.display = item.effect ? 'block' : 'none'; eff.textContent = item.effect || '';
+  openModal('extraModal');
+}
+function nextExtraOrClose() { closeModal('extraModal'); if (extraQueue.length) setTimeout(showNextExtra, 180); }
+function showEndGameModal(earlyId) {
+  const ranks = CONFIG.factions.map(f => ({ ...calcFactionScore(f.id), name: f.name, color: f.color })).sort((a, b) => b.score - a.score);
+  const champId = earlyId || ranks[0].fid, champ = CONFIG.factions.find(f => f.id === champId);
+  document.getElementById('endTitle').textContent = champId === GAME.playerFactionId ? '🏆 风云登顶 · 胜利！' : '🌑 尘埃落定 · 败北';
+  document.getElementById('endBody').innerHTML = `<p style="margin-top:0;font-size:13px;"><strong>${escapeHtml(champ.name)}</strong> 赢得本局！</p>` +
+    ranks.map((r, i) => `<div class="rank-row"><span>#${i+1} <span class="pin-dot" style="background:${r.color}"></span> <strong>${escapeHtml(r.name)}</strong></span><span class="mono">地标${r.owned} · $${r.money} · <strong>${r.score}分</strong></span></div>`).join('');
+  openModal('endModal');
+}
+function addLog(text, type = '') { GAME.logs.unshift({ night: GAME.night, text, type }); if (GAME.logs.length > 80) GAME.logs.pop(); }
+function renderNews() {
+  document.getElementById('newsCountBadge').textContent = `${GAME.logs.length}条`;
+  document.getElementById('newsFeed').innerHTML = GAME.logs.length ? GAME.logs.map(l => `<div class="log-entry ${l.type}"><span class="badge" style="margin-right:5px;">第${l.night}晚</span>${escapeHtml(l.text)}</div>`).join('') : `<div style="text-align:center;padding:24px;color:var(--text-muted);">尚无战报。</div>`;
+}
+function openGuideModal() { openModal('guideModal'); }
+function openRankModal() {
+  const ranks = CONFIG.factions.map(f => ({ ...calcFactionScore(f.id), name: f.name, color: f.color })).sort((a, b) => b.score - a.score);
+  document.getElementById('rankList').innerHTML = ranks.map((r, i) => `<div class="rank-row"><span>#${i+1} <span class="pin-dot" style="background:${r.color}"></span> <strong>${escapeHtml(r.name)}</strong> ${r.fid===GAME.playerFactionId?'(你)':''}</span><span class="mono">地标${r.owned} · $${r.money} · <strong>${r.score}分</strong></span></div>`).join('');
+  openModal('rankModal');
+}
+
+/* GM 后台（与 v3.0 一致，保存自动推云端） */
+function openGmAuth() { if (gmAuthed) { openModal('gmModal'); renderGmTab(); } else { document.getElementById('gmPwdInput').value = ''; openModal('gmAuthModal'); } }
+function verifyGmPwd() { if (document.getElementById('gmPwdInput').value.trim() === GM_PASSWORD) { gmAuthed = true; closeModal('gmAuthModal'); openModal('gmModal'); renderGmTab(); } else showToast('密码错误'); }
+async function closeGmModal() { await saveConfig(); closeModal('gmModal'); renderStartScreen(); if (GAME) renderAll(); }
+function switchGmTab(tab, btn) { currentGmTab = tab; document.querySelectorAll('.gm-tab-btn').forEach(b => b.classList.remove('active')); if (btn) btn.classList.add('active'); renderGmTab(); }
+function renderGmTab() {
+  const box = document.getElementById('gmContent');
+  if (currentGmTab === 'world') renderGmWorld(box);
+  else if (currentGmTab === 'agents') renderGmAgents(box);
+  else if (currentGmTab === 'skills') renderGmSkills(box);
+  else if (currentGmTab === 'stories') renderGmStories(box);
+  else renderGmIO(box);
+}
+function renderGmWorld(box) {
+  box.innerHTML = `
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">🗺️ 自定义地图底图</div>
+      <input type="text" id="gmMapUrl" value="${escapeAttr(CONFIG.mapImage||'')}" placeholder="图片URL（留空用默认网格）">
+      <input type="file" accept="image/*" style="margin-top:6px;" onchange="uploadMapImg(this)">
+    </div>
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">🎬 每晚过场文案（每行一条）</div>
+      <textarea id="gmCutscenes" style="min-height:100px;">${escapeHtml((CONFIG.cutsceneTexts||[]).join('\n'))}</textarea>
+    </div>
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">🏢 组织名称与介绍</div>
+      ${CONFIG.factions.map((f,i)=>`<div style="margin-bottom:8px;"><div class="form-row-2"><input type="text" value="${escapeAttr(f.name)}" onchange="CONFIG.factions[${i}].name=this.value"><input type="text" value="${escapeAttr(f.color)}" onchange="CONFIG.factions[${i}].color=this.value"></div><input type="text" style="margin-top:4px;" value="${escapeAttr(f.desc||'')}" onchange="CONFIG.factions[${i}].desc=this.value" placeholder="组织介绍"></div>`).join('')}
+    </div>
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">📍 地标名称与 X/Y 坐标</div>
+      ${CONFIG.landmarks.map((l,i)=>`<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:6px;"><input type="text" value="${escapeAttr(l.name)}" onchange="CONFIG.landmarks[${i}].name=this.value"><input type="number" value="${l.x}" onchange="CONFIG.landmarks[${i}].x=Number(this.value)"><input type="number" value="${l.y}" onchange="CONFIG.landmarks[${i}].y=Number(this.value)"></div>`).join('')}
+    </div>
+    <button class="btn btn-primary btn-block" onclick="CONFIG.mapImage=document.getElementById('gmMapUrl').value.trim();CONFIG.cutsceneTexts=document.getElementById('gmCutscenes').value.split('\\n').map(s=>s.trim()).filter(Boolean);saveConfig()">☁️ 保存并同步到云端</button>`;
+}
+function uploadMapImg(input) { const f = input.files[0]; if (!f) return; const r = new FileReader(); r.onload = e => { document.getElementById('gmMapUrl').value = e.target.result; CONFIG.mapImage = e.target.result; saveConfig(); }; r.readAsDataURL(f); }
+
+let editingAgentIdx = -1;
+function renderGmAgents(box) {
+  const a = editingAgentIdx >= 0 ? CONFIG.agents[editingAgentIdx] : { id:'ag_'+Date.now(), factionId:CONFIG.factions[0].id, name:'', role:'combat', power:75, loyalty:85, quote:'', skills:[], avatar:'' };
+  box.innerHTML = `
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">${editingAgentIdx>=0?'✏️ 编辑干员':'➕ 新增干员 OC'}</div>
+      <div class="form-row-2"><div class="form-group"><label>姓名</label><input type="text" id="agName" value="${escapeAttr(a.name)}"></div><div class="form-group"><label>组织</label><select id="agFaction">${CONFIG.factions.map(f=>`<option value="${f.id}" ${a.factionId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></div></div>
+      <div class="form-row-2"><div class="form-group"><label>职能位</label><select id="agRole"><option value="combat" ${a.role==='combat'?'selected':''}>⚔️战斗位</option><option value="resource" ${a.role==='resource'?'selected':''}>💼资源位</option><option value="strategy" ${a.role==='strategy'?'selected':''}>👁️策略位</option></select></div><div class="form-group"><label>行动值</label><input type="number" id="agPower" value="${a.power}"></div></div>
+      <div class="form-row-2"><div class="form-group"><label>初始忠诚</label><input type="number" id="agLoyalty" value="${a.loyalty}"></div><div class="form-group"><label>头像URL</label><input type="text" id="agAvatar" value="${escapeAttr(a.avatar||'')}"></div></div>
+      <div class="form-group"><label>一句话台词（留空不显示）</label><input type="text" id="agQuote" value="${escapeAttr(a.quote||'')}"></div>
+      <div class="form-group"><label>挂载技能（最多3个）</label>${[0,1,2].map(i=>`<select id="agSkill${i}" style="margin-bottom:5px;"><option value="">-- 无 --</option>${CONFIG.skills.map(s=>`<option value="${s.id}" ${(a.skills||[])[i]===s.id?'selected':''}>${escapeHtml(s.name)}：${escapeHtml(s.desc)}</option>`).join('')}</select>`).join('')}</div>
+      <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-block" onclick="saveGmAgent()">☁️ 保存干员</button>${editingAgentIdx>=0?`<button class="btn" onclick="editingAgentIdx=-1;renderGmTab()">取消</button>`:''}</div>
+    </div>
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">干员列表（${CONFIG.agents.length}人）</div>
+      ${CONFIG.agents.map((ag,idx)=>`<div class="rank-row"><span><strong>${escapeHtml(ag.name)}</strong> (${escapeHtml(CONFIG.factions.find(f=>f.id===ag.factionId)?.name||'')} · ${ag.power})</span><span style="display:flex;gap:4px;"><button class="icon-btn" onclick="editingAgentIdx=${idx};renderGmTab()">编辑</button><button class="icon-btn danger" onclick="if(confirm('删除?')){CONFIG.agents.splice(${idx},1);saveConfig();renderGmTab()}">删</button></span></div>`).join('')}
+    </div>`;
+}
+function saveGmAgent() {
+  const name = document.getElementById('agName').value.trim(); if (!name) return showToast('请填姓名');
+  const obj = { id: editingAgentIdx>=0?CONFIG.agents[editingAgentIdx].id:'ag_'+Date.now(), factionId:document.getElementById('agFaction').value, name, role:document.getElementById('agRole').value, power:clamp(Number(document.getElementById('agPower').value)||75,40,100), loyalty:clamp(Number(document.getElementById('agLoyalty').value)||80,0,100), avatar:document.getElementById('agAvatar').value.trim(), quote:document.getElementById('agQuote').value.trim(), skills:[...new Set([0,1,2].map(i=>document.getElementById('agSkill'+i).value).filter(Boolean))] };
+  if (editingAgentIdx>=0) CONFIG.agents[editingAgentIdx]=obj; else CONFIG.agents.push(obj);
+  editingAgentIdx=-1; saveConfig(); renderGmTab();
+}
+function renderGmSkills(box) {
+  box.innerHTML = `
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">🧩 新增积木技能（支持负数）</div>
+      <div class="form-row-2"><div class="form-group"><label>技能名</label><input type="text" id="skName"></div><div class="form-group"><label>触发时机</label><select id="skTrigger"><option value="on_recruit">1.招募入队时</option><option value="on_deploy">2.每次出勤时</option><option value="on_streak">3.连续出勤时</option><option value="on_action">4.执行指定指令时</option><option value="on_landmark">5.在绑定地标时</option><option value="on_win">6.冲突获胜时</option><option value="on_lose">7.冲突战败时</option><option value="passive">8.常驻生效</option></select></div></div>
+      <div class="form-row-2"><div class="form-group"><label>效果类型</label><select id="skEffect"><option value="power_pct">行动值±%</option><option value="money">资金±$</option><option value="loyalty">自身忠诚±</option><option value="loyalty_all">全员忠诚±</option><option value="loyalty_night">每晚忠诚±</option><option value="immune_injury">免伤(填1)</option><option value="immune_defect">免叛变(填1)</option><option value="easy_fatigue">易疲劳(填-1)</option></select></div><div class="form-group"><label>数值</label><input type="number" id="skVal" value="15"></div></div>
+      <div class="form-group"><label>绑定参数（如 fight 或 l6）</label><input type="text" id="skParam"></div>
+      <div class="form-group"><label>效果说明</label><input type="text" id="skDesc"></div>
+      <button class="btn btn-primary btn-block" onclick="CONFIG.skills.push({id:'sk_'+Date.now(),name:document.getElementById('skName').value.trim(),trigger:document.getElementById('skTrigger').value,effectType:document.getElementById('skEffect').value,value:Number(document.getElementById('skVal').value)||0,param:document.getElementById('skParam').value.trim(),desc:document.getElementById('skDesc').value.trim()});saveConfig();renderGmTab()">➕ 添加并同步</button>
+    </div>
+    <div class="card">${CONFIG.skills.map((s,i)=>`<div class="rank-row"><span><strong>${escapeHtml(s.name)}</strong> · ${escapeHtml(s.desc)}</span><button class="icon-btn danger" onclick="CONFIG.skills.splice(${i},1);saveConfig();renderGmTab()">删</button></div>`).join('')}</div>`;
+}
+function renderGmStories(box) {
+  const opts = `<option value="">-- 无 --</option>` + CONFIG.agents.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  box.innerHTML = `
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">📰 新增随机号外（35%概率触发）</div>
+      <div class="form-group"><label>标题</label><input type="text" id="exTitle"></div>
+      <div class="form-group"><label>正文</label><textarea id="exBody"></textarea></div>
+      <div class="form-row-2"><div class="form-group"><label>效果</label><select id="exEff"><option value="none">纯剧情</option><option value="player_money">玩家资金±</option><option value="all_money">全城资金±</option><option value="player_loyalty">玩家忠诚±</option></select></div><div class="form-group"><label>数值</label><input type="number" id="exVal" value="30"></div></div>
+      <button class="btn btn-primary btn-block" onclick="CONFIG.extras.push({id:'ex_'+Date.now(),title:document.getElementById('exTitle').value,body:document.getElementById('exBody').value,effectType:document.getElementById('exEff').value,effectValue:Number(document.getElementById('exVal').value)||0});saveConfig();renderGmTab()">➕ 加入号外池</button>
+      <div style="margin-top:8px;">${CONFIG.extras.map((ex,i)=>`<div class="rank-row"><span>${escapeHtml(ex.title)}</span><button class="icon-btn danger" onclick="CONFIG.extras.splice(${i},1);saveConfig();renderGmTab()">删</button></div>`).join('')}</div>
+    </div>
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">🎭 新增小故事</div>
+      <div class="form-row-2"><div class="form-group"><label>类型</label><select id="stType"><option value="encounter">同地标相遇(+10%)</option><option value="timed">定时触发</option></select></div><div class="form-group"><label>第几晚</label><input type="number" id="stNight" value="2"></div></div>
+      <div class="form-row-2"><div class="form-group"><label>角色1</label><select id="stA1">${opts}</select></div><div class="form-group"><label>角色2</label><select id="stA2">${opts}</select></div></div>
+      <div class="form-group"><label>标题</label><input type="text" id="stTitle"></div>
+      <div class="form-group"><label>正文</label><textarea id="stBody"></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="CONFIG.stories.push({id:'st_'+Date.now(),type:document.getElementById('stType').value,night:Number(document.getElementById('stNight').value)||2,agent1:document.getElementById('stA1').value,agent2:document.getElementById('stA2').value,title:document.getElementById('stTitle').value,body:document.getElementById('stBody').value,effectType:'money',effectValue:20});saveConfig();renderGmTab()">➕ 添加小故事</button>
+      <div style="margin-top:8px;">${CONFIG.stories.map((st,i)=>`<div class="rank-row"><span>${escapeHtml(st.title)}</span><button class="icon-btn danger" onclick="CONFIG.stories.splice(${i},1);saveConfig();renderGmTab()">删</button></div>`).join('')}</div>
+    </div>`;
+}
+function renderGmIO(box) {
+  box.innerHTML = `
+    <div class="card"><div class="card-title" style="margin-bottom:8px;">📦 JSON 备份与迁移</div>
+      <button class="btn btn-primary btn-block" onclick="exportConfigFile()" style="margin-bottom:8px;">⬇️ 导出 JSON 文件</button>
+      <button class="btn btn-block" onclick="navigator.clipboard?.writeText(JSON.stringify(CONFIG)).then(()=>showToast('已复制'))" style="margin-bottom:10px;">📋 复制 JSON</button>
+      <textarea id="gmImportText" placeholder="粘贴 JSON 导入..."></textarea>
+      <button class="btn btn-jade btn-block" style="margin-top:8px;" onclick="try{CONFIG={...createDefaultConfig(),...JSON.parse(document.getElementById('gmImportText').value)};saveConfig();renderGmTab();}catch(e){showToast('JSON格式有误')}">⬆️ 导入并同步云端</button>
+    </div>`;
+}
+function exportConfigFile() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(CONFIG,null,2)],{type:'application/json'})); a.download = 'GoneWithWind_v3.5_config.json'; a.click(); }
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
+
+checkGmEntrance();
+renderStartScreen();
+syncConfigFromCloud();
+</script>
+</body>
+</html>
